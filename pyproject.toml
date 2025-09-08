@@ -12,10 +12,8 @@ dependencies = [
     "tomlkit",
     "build",
     "twine",
+    "Cython"
 ]
-
-[project.optional-dependencies]
-cython = ["Cython>=0.29.0"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
