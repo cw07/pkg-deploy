@@ -80,22 +80,22 @@ def get_credentials(args) -> tuple[Optional[str], Optional[str]]:
     # 如果强制交互模式，直接进入交互输入
     if force_interactive and not args.dry_run:
         if not username and not password:
-            print(f"\n🔐 Repository Authentication Required")
+            logger.info(f"\n🔐 Repository Authentication Required")
             if is_pypi:
-                print(f"PyPI Repository: https://pypi.org/")
-                print("💡 Tip: Use API tokens instead of passwords for better security")
+                logger.info(f"PyPI Repository: https://pypi.org/")
+                logger.info("💡 Tip: Use API tokens instead of passwords for better security")
             elif is_test_pypi:
-                print(f"TestPyPI Repository: https://test.pypi.org/")
-                print("💡 Tip: Use API tokens instead of passwords for better security")
+                logger.info(f"TestPyPI Repository: https://test.pypi.org/")
+                logger.info("💡 Tip: Use API tokens instead of passwords for better security")
             elif is_nexus:
-                print(f"Nexus Repository: {args.repository_url}")
+                logger.info(f"Nexus Repository: {args.repository_url}")
             else:
-                print(f"Repository: {args.repository_url}")
-            print("-" * 60)
+                logger.info(f"Repository: {args.repository_url}")
+            logger.info("-" * 60)
 
             # 用户名输入
             if is_pypi or is_test_pypi:
-                print("For PyPI API tokens, use '__token__' as username")
+                logger.info("For PyPI API tokens, use '__token__' as username")
                 username_input = input("Username (default: __token__): ").strip()
                 username = username_input if username_input else "__token__"
             elif is_nexus:
@@ -117,7 +117,7 @@ def get_credentials(args) -> tuple[Optional[str], Optional[str]]:
                 logger.error("Password/Token cannot be empty")
                 raise ValueError("Password/Token is required for deployment")
 
-            print("-" * 60)
+            logger.info("-" * 60)
             return username, password
 
     # 1. 检查环境变量
@@ -157,9 +157,9 @@ def get_credentials(args) -> tuple[Optional[str], Optional[str]]:
     # 3. 如果仍然缺少凭据且需要部署，交互式输入
     if args.repository_url and not args.dry_run and (not username or not password):
         if is_nexus:
-            print(f"\n🔐 Nexus Repository Authentication Required")
-            print(f"Repository: {args.repository_url}")
-            print("-" * 50)
+            logger.info(f"\n🔐 Nexus Repository Authentication Required")
+            logger.info(f"Repository: {args.repository_url}")
+            logger.info("-" * 50)
 
             if not username:
                 username_input = input("Username (default: admin): ").strip()
@@ -172,26 +172,26 @@ def get_credentials(args) -> tuple[Optional[str], Optional[str]]:
                     logger.error("Password cannot be empty for Nexus deployment")
                     raise ValueError("Password is required for Nexus deployment")
 
-            print("-" * 50)
+            logger.info("-" * 50)
         else:
             # PyPI 或其他仓库
             if not username or not password:
-                print(f"\n🔐 Repository Authentication Required")
+                logger.info(f"\n🔐 Repository Authentication Required")
                 if is_pypi:
-                    print("PyPI Repository: https://pypi.org/")
-                    print("💡 Recommended: Use API tokens for better security")
-                    print("   Get your token at: https://pypi.org/manage/account/token/")
+                    logger.info("PyPI Repository: https://pypi.org/")
+                    logger.info("💡 Recommended: Use API tokens for better security")
+                    logger.info("   Get your token at: https://pypi.org/manage/account/token/")
                 elif is_test_pypi:
-                    print("TestPyPI Repository: https://test.pypi.org/")
-                    print("💡 Recommended: Use API tokens for better security")
-                    print("   Get your token at: https://test.pypi.org/manage/account/token/")
+                    logger.info("TestPyPI Repository: https://test.pypi.org/")
+                    logger.info("💡 Recommended: Use API tokens for better security")
+                    logger.info("   Get your token at: https://test.pypi.org/manage/account/token/")
                 else:
-                    print(f"Repository: {args.repository_url}")
-                print("-" * 60)
+                    logger.info(f"Repository: {args.repository_url}")
+                logger.info("-" * 60)
 
                 if not username:
                     if is_pypi or is_test_pypi:
-                        print("For API tokens, use '__token__' as username")
+                        logger.info("For API tokens, use '__token__' as username")
                         username_input = input("Username (default: __token__): ").strip()
                         username = username_input if username_input else "__token__"
                     else:
