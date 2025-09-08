@@ -13,7 +13,7 @@ class VersionManager:
         self.config = self._load_config()
 
     def _load_config(self) -> Dict[str, Any]:
-        """加载 pyproject.toml 配置"""
+        """load pyproject.toml"""
         if not self.pyproject_path.exists():
             raise FileNotFoundError(f"pyproject.toml not found at {self.pyproject_path}")
 
@@ -23,12 +23,10 @@ class VersionManager:
         return doc
 
     def _save_config(self):
-        """保存配置到 pyproject.toml"""
         with open(self.pyproject_path, 'w', encoding='utf-8') as f:
             f.write(tomlkit.dumps(self.config))
 
     def get_current_version(self) -> str:
-        """获取当前版本"""
         return self.config['project']['version']
 
     def bump_version(self, version_type: str) -> str:
