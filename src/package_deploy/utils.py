@@ -1,12 +1,12 @@
 import os
 import re
-import shutil
-import subprocess
 import sys
 import toml
+import shutil
 import tomlkit
 import logging
 import getpass
+import subprocess
 import configparser
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -76,32 +76,18 @@ def create_sample_pyproject_toml():
 
     with open("pyproject.toml", "w", encoding="utf-8") as f:
         toml.dump(sample_config, f)
-    print("Created sample pyproject.toml")
+    logger.info("Created sample pyproject.toml")
 
 
 def get_credentials(args) -> tuple[Optional[str], Optional[str]]:
-    """
-    获取认证凭据，优先级：命令行参数 > 环境变量 > .pypirc 文件 > 交互输入
-
-    Args:
-        args: 命令行参数对象
-
-    Returns:
-        tuple: (username, password/token) 元组
-
-    Raises:
-        ValueError: 当密码为空且需要部署时
-    """
     username = args.username
     password = args.password
     is_pypi = args.repository_name and "pypi" in args.repository_name.lower()
     force_interactive = args.interactive
 
-    # PyPI 和 TestPyPI 现在主要使用 API Token
     if is_pypi:
         logger.info(" Detected PyPI repository - API tokens are recommended over passwords")
 
-    # 如果强制交互模式，直接进入交互输入
     if not args.dry_run and (force_interactive or (not username and not password)):
         logger.info(f"\n Repository Authentication Required")
         if is_pypi:
@@ -111,7 +97,6 @@ def get_credentials(args) -> tuple[Optional[str], Optional[str]]:
             logger.info(f"Repository: {args.repository_url}")
         logger.info("-" * 60)
 
-    # 用户名输入
     if is_pypi:
         logger.info("For PyPI API tokens, use '__token__' as username")
         username_input = input("Username (default: __token__): ").strip()
@@ -123,7 +108,6 @@ def get_credentials(args) -> tuple[Optional[str], Optional[str]]:
     if username:
         logger.info(f"Using username: {username}")
 
-    # 密码/Token 输入
     if username == "__token__":
         password = getpass.getpass("API Token (pypi-...): ")
     else:
@@ -206,13 +190,13 @@ def get_pypirc_info():
         pypirc_info['repositories'] = repositories
         return pypirc_info
     except Exception as e:
-        print(f"Error reading .pypirc file: {e}")
+        logger.error(f"Error reading .pypirc file: {e}")
         return None
 
 def ensure_uv_installed():
     """Check if 'uv' is available, and install it if not."""
     if shutil.which("uv"):
-        print("uv is already installed and available in PATH.")
+        logger.info("uv is already installed and available in PATH.")
         return
 
     try:
@@ -222,12 +206,12 @@ def ensure_uv_installed():
             text=True,
             check=True
         )
-        print(f"uv is installed as a module: {result.stdout.strip()}")
+        logger.info(f"uv is installed as a module: {result.stdout.strip()}")
         return
     except (subprocess.CalledProcessError, FileNotFoundError):
         pass  # uv not available as module either
 
-    print("uv not found. Installing uv via pip...")
+    logger.info("uv not found. Installing uv via pip...")
     try:
         subprocess.run(
             [sys.executable, "-m", "pip", "install", "uv"],
@@ -235,9 +219,9 @@ def ensure_uv_installed():
             capture_output=True,
             text=True
         )
-        print("uv installed successfully.")
+        logger.info("uv installed successfully.")
     except subprocess.CalledProcessError as e:
-        print("Failed to install uv:", e.stderr)
+        logger.error("Failed to install uv:", e.stderr)
         raise RuntimeError(
             "Failed to install uv automatically. Please install it manually:\n"
             "  pip install uv\n"
@@ -251,7 +235,7 @@ def ensure_uv_installed():
             text=True,
             check=True
         )
-        print(f"uv version: {result.stdout.strip()}")
+        logger.info(f"uv version: {result.stdout.strip()}")
     except subprocess.CalledProcessError as e:
         raise RuntimeError("uv installed but failed to run.") from e
 
