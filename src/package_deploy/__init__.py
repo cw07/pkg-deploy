@@ -41,11 +41,6 @@ def parse_args(args):
     )
 
     parser.add_argument(
-        "--package-name", "-n",
-        help="Package name"
-    )
-
-    parser.add_argument(
         "--version-type", "-v",
         choices=["patch", "minor", "major", "prerelease"],
         default="patch",
@@ -105,6 +100,9 @@ def parse_args(args):
 class PackageDeploy:
     def __init__(self, args):
         args = parse_args(args)
+        if not (args.project_dir / "pyproject.toml").exists():
+            raise ValueError("pyproject.toml not found")
+
         if args.verbose:
             logging.getLogger().setLevel(logging.DEBUG)
 
@@ -157,9 +155,6 @@ class PackageDeploy:
         logger.info(f"Starting deployment for package: {self.config.package_name}")
 
         try:
-            # 1. Update package name (if specified)
-            self._update_package_name(self.config.package_name)
-
             new_version = self.version_manager.bump_version(self.config.version_type)
             logger.info(f"New version: {new_version}")
 
@@ -188,7 +183,7 @@ class PackageDeploy:
         shutil.rmtree('dist', ignore_errors=True)
         shutil.rmtree('build', ignore_errors=True)
         shutil.rmtree(f'src/{self.config.package_name}.egg-info', ignore_errors=True)
-        egg_info_name = logger.project_name.replace("-", "_")
+        egg_info_name = self.config.package_name.replace("-", "_")
         shutil.rmtree(f'src/{egg_info_name}.egg-info', ignore_errors=True)
         launcher_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
         directory = os.path.join(launcher_dir, 'src', self.config.package_name.replace("-", "_"))
@@ -209,12 +204,6 @@ class PackageDeploy:
             if isinstance(ex, subprocess.CalledProcessError):
                 logger.error(ex.output)
             logger.warning('Failed to push bump version commit. Please merge and push manually.')
-
-    def _update_package_name(self, package_name: Optional[str]):
-        if package_name and package_name != self.version_manager.config['project']['name']:
-            logger.info(f"Updating package name to: {package_name}")
-            self.version_manager.config['project']['name'] = package_name
-            save_config(self.version_manager.config, self.config.pyproject_path)
 
     @staticmethod
     def _get_deploy_strategy(config) -> Deploy:
