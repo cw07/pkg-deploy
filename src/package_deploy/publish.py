@@ -108,7 +108,6 @@ class PackageDeploy:
 
         pypirc_info = get_pypirc_info()
         repos = pypirc_info["repositories"]
-
         if args.repository_name and args.repository_name in repos:
             repository_info = repos[args.repository_name]
             url = repository_info["repository"]
@@ -129,6 +128,7 @@ class PackageDeploy:
             pyproject_path=pyproject_path,
             version_type=args.version_type,
             use_cython=args.cython,
+            is_uv_venv=is_uv_venv(),
             repository_name=args.repository_name,
             repository_url=url,
             username=username,
@@ -166,9 +166,6 @@ class PackageDeploy:
         required_packages = ["build", "twine", "toml", "tomlkit"]
         if cython:
             required_packages.append("Cython")
-        if is_uv_venv():
-            required_packages.append("virtualenv")
-            setup_uv_compatibility()
 
         missing_packages = []
         for package in required_packages:

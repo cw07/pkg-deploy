@@ -17,6 +17,7 @@ class DeployConfig:
     pyproject_path: Path
     version_type: str
     use_cython: bool
+    is_uv_venv: bool
     repository_name: str
     repository_url: Optional[str] = None
     username: Optional[str] = None
@@ -26,6 +27,14 @@ class DeployConfig:
 
 class BuildStrategy(ABC):
 
+    @staticmethod
+    def build_cmd():
+        if is_uv_venv:
+            cmd = ["uv", "build", "--wheel"]
+        else:
+            cmd = [sys.executable, "-m", "build", "--wheel"]
+        return cmd
+
     @abstractmethod
     def build(self, config: DeployConfig, work_dir: Path) -> bool:
         pass
@@ -34,7 +43,7 @@ class BuildStrategy(ABC):
 class StandardBuildStrategy(BuildStrategy):
 
     def build(self, config: DeployConfig, project_dir: Path) -> bool:
-        cmd = [sys.executable, "-m", "build", "--wheel"]
+        cmd = self.build_cmd()
         logger.info(f"Running: {' '.join(cmd)}")
         result = subprocess.run(cmd, capture_output=True, text=True, cwd=project_dir)
         if result.returncode != 0:
@@ -48,13 +57,10 @@ class CythonBuildStrategy(BuildStrategy):
         try:
             self._setup_cython_build(project_dir)
             self.create_setup_py_for_cython()
-
-            cmd = [sys.executable, "-m", "build", str(project_dir)]
+            cmd = self.build_cmd()
             logger.info(f"Running Cython build: {' '.join(cmd)}")
-
             env = os.environ.copy()
             env['CYTHONIZE'] = '1'
-
             result = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=project_dir)
 
             if result.returncode != 0:
@@ -79,7 +85,7 @@ class CythonBuildStrategy(BuildStrategy):
             if 'requires' not in config['build-system']:
                 config['build-system']['requires'] = []
 
-            cython_deps = ['setuptools', 'wheel', 'Cython']
+            cython_deps = ['setuptools', 'Cython']
             requires = config['build-system']['requires']
             for dep in cython_deps:
                 if not any(req.startswith(dep) for req in requires):
