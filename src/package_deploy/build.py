@@ -59,8 +59,7 @@ class CythonBuildStrategy(BuildStrategy):
             result = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=project_dir)
 
             if result.returncode != 0:
-                logger.error(f"Cython build failed: {result.stderr}")
-                return False
+                raise ValueError(f"Cython build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
 
             logger.info("Cython build completed successfully")
             return True
