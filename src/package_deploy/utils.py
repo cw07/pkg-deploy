@@ -1,5 +1,7 @@
 import os
 import re
+import shutil
+import subprocess
 import sys
 import toml
 import tomlkit
@@ -206,6 +208,52 @@ def get_pypirc_info():
     except Exception as e:
         print(f"Error reading .pypirc file: {e}")
         return None
+
+def ensure_uv_installed():
+    """Check if 'uv' is available, and install it if not."""
+    if shutil.which("uv"):
+        print("uv is already installed and available in PATH.")
+        return
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "uv", "--version"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        print(f"uv is installed as a module: {result.stdout.strip()}")
+        return
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass  # uv not available as module either
+
+    print("uv not found. Installing uv via pip...")
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "uv"],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        print("uv installed successfully.")
+    except subprocess.CalledProcessError as e:
+        print("Failed to install uv:", e.stderr)
+        raise RuntimeError(
+            "Failed to install uv automatically. Please install it manually:\n"
+            "  pip install uv\n"
+            "Or download from: https://github.com/astral-sh/uv/releases"
+        ) from e
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "uv", "--version"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        print(f"uv version: {result.stdout.strip()}")
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError("uv installed but failed to run.") from e
 
 
 def load_config(pyproject_path: Path) -> Dict[str, Any]:

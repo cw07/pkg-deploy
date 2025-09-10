@@ -8,7 +8,7 @@ from typing import Optional
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
-from package_deploy.utils import save_config, is_uv_venv
+from package_deploy.utils import save_config, is_uv_venv, ensure_uv_installed
 
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,7 @@ class BuildStrategy(ABC):
     @staticmethod
     def build_cmd():
         if is_uv_venv():
+            ensure_uv_installed()
             cmd = ["uv", "build", "--wheel"]
         else:
             cmd = [sys.executable, "-m", "build", "--wheel"]
