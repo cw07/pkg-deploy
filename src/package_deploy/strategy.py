@@ -60,7 +60,7 @@ class CythonBuildStrategy(BuildStrategy):
     def build(self, config: DeployConfig, project_dir: Path) -> bool:
         try:
             self._setup_cython_build(project_dir)
-            self.create
+            self.create_setup_py_for_cython()
 
             cmd = [sys.executable, "-m", "build", str(project_dir)]
             logger.info(f"Running Cython build: {' '.join(cmd)}")
