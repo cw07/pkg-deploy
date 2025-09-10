@@ -139,7 +139,7 @@ class PackageDeploy:
 
     @staticmethod
     def check_require_package(cython: bool):
-        required_packages = ["build", "twine", "toml"]
+        required_packages = ["build", "twine", "toml", "tomlkit"]
         if cython:
             required_packages.append("Cython")
         if is_uv_venv():
