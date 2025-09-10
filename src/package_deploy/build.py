@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from typing import Optional
 from dataclasses import dataclass
 
@@ -62,6 +63,7 @@ class CythonBuildStrategy(BuildStrategy):
                 raise ValueError(f"Cython build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
 
             logger.info("Cython build completed successfully")
+            time.sleep(0.1)
             return True
 
         except Exception as e:
