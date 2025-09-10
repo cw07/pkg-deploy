@@ -1,8 +1,6 @@
-import tomlkit
 from pathlib import Path
-from typing import Dict, Any
 
-from package_deploy.utils import parse_prerelease, logger
+from package_deploy.utils import parse_prerelease, logger, load_config, save_config
 
 
 class VersionManager:
@@ -10,21 +8,7 @@ class VersionManager:
 
     def __init__(self, pyproject_path: Path):
         self.pyproject_path = pyproject_path
-        self.config = self._load_config()
-
-    def _load_config(self) -> Dict[str, Any]:
-        """load pyproject.toml"""
-        if not self.pyproject_path.exists():
-            raise FileNotFoundError(f"pyproject.toml not found at {self.pyproject_path}")
-
-        with open(self.pyproject_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        doc = tomlkit.parse(content)
-        return doc
-
-    def _save_config(self):
-        with open(self.pyproject_path, 'w', encoding='utf-8') as f:
-            f.write(tomlkit.dumps(self.config))
+        self.config = load_config(pyproject_path)
 
     def get_current_version(self) -> str:
         return self.config['project']['version']
@@ -109,7 +93,7 @@ class VersionManager:
             new_version = f"{major}.{minor}.{patch}"
 
         self.config['project']['version'] = new_version
-        self._save_config()
+        save_config(self.config, self.pyproject_path)
 
         logger.info(f"Version bumped from {current_version} to {new_version}")
         return new_version

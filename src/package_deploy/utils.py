@@ -1,8 +1,12 @@
 import os
 import re
 import toml
+import tomlkit
 import logging
-from typing import Optional
+import getpass
+import configparser
+from pathlib import Path
+from typing import Dict, Any, Optional
 
 
 logging.basicConfig(
@@ -62,166 +66,46 @@ def get_credentials(args) -> tuple[Optional[str], Optional[str]]:
     Raises:
         ValueError: 当密码为空且需要部署时
     """
-    import getpass
-    import configparser
-    from pathlib import Path
-
     username = args.username
     password = args.password
-    is_nexus = args.repository_url and 'nexus' in args.repository_url.lower()
-    is_pypi = not args.repository_url or 'pypi.org' in args.repository_url.lower()
-    is_test_pypi = args.repository_url and 'test.pypi.org' in args.repository_url.lower()
+    is_pypi = args.repository_name and "pypi" in args.repository_name.lower()
     force_interactive = args.interactive
 
     # PyPI 和 TestPyPI 现在主要使用 API Token
-    if is_pypi or is_test_pypi:
-        logger.info("📦 Detected PyPI repository - API tokens are recommended over passwords")
+    if is_pypi:
+        logger.info(" Detected PyPI repository - API tokens are recommended over passwords")
 
     # 如果强制交互模式，直接进入交互输入
-    if force_interactive and not args.dry_run:
-        if not username and not password:
-            logger.info(f"\n🔐 Repository Authentication Required")
-            if is_pypi:
-                logger.info(f"PyPI Repository: https://pypi.org/")
-                logger.info("💡 Tip: Use API tokens instead of passwords for better security")
-            elif is_test_pypi:
-                logger.info(f"TestPyPI Repository: https://test.pypi.org/")
-                logger.info("💡 Tip: Use API tokens instead of passwords for better security")
-            elif is_nexus:
-                logger.info(f"Nexus Repository: {args.repository_url}")
-            else:
-                logger.info(f"Repository: {args.repository_url}")
-            logger.info("-" * 60)
-
-            # 用户名输入
-            if is_pypi or is_test_pypi:
-                logger.info("For PyPI API tokens, use '__token__' as username")
-                username_input = input("Username (default: __token__): ").strip()
-                username = username_input if username_input else "__token__"
-            elif is_nexus:
-                username_input = input("Username (default: admin): ").strip()
-                username = username_input if username_input else "admin"
-            else:
-                username = input("Username: ").strip()
-
-            if username:
-                logger.info(f"Using username: {username}")
-
-            # 密码/Token 输入
-            if username == "__token__":
-                password = getpass.getpass("API Token (pypi-...): ")
-            else:
-                password = getpass.getpass("Password: ")
-
-            if not password:
-                logger.error("Password/Token cannot be empty")
-                raise ValueError("Password/Token is required for deployment")
-
-            logger.info("-" * 60)
-            return username, password
-
-    # 1. 检查环境变量
-    if not username:
-        if is_pypi or is_test_pypi:
-            username = os.environ.get('TWINE_USERNAME') or os.environ.get('PYPI_USERNAME')
+    if not args.dry_run and (force_interactive or (not username and not password)):
+        logger.info(f"\n Repository Authentication Required")
+        if is_pypi:
+            logger.info(f"PyPI Repository: https://pypi.org/")
+            logger.info(" Tip: Use API tokens instead of passwords for better security")
         else:
-            username = os.environ.get('TWINE_USERNAME') or os.environ.get('NEXUS_USERNAME')
+            logger.info(f"Repository: {args.repository_url}")
+        logger.info("-" * 60)
+
+    # 用户名输入
+    if is_pypi:
+        logger.info("For PyPI API tokens, use '__token__' as username")
+        username_input = input("Username (default: __token__): ").strip()
+        username = username_input if username_input else "__token__"
+    else:
+        username_input = input("Username (default: admin): ").strip()
+        username = username_input if username_input else "admin"
+
+    if username:
+        logger.info(f"Using username: {username}")
+
+    # 密码/Token 输入
+    if username == "__token__":
+        password = getpass.getpass("API Token (pypi-...): ")
+    else:
+        password = getpass.getpass("Password: ")
 
     if not password:
-        if is_pypi or is_test_pypi:
-            password = os.environ.get('TWINE_PASSWORD') or os.environ.get('PYPI_TOKEN')
-        else:
-            password = os.environ.get('TWINE_PASSWORD') or os.environ.get('NEXUS_PASSWORD')
-
-    # 2. 检查 .pypirc 文件
-    if not username or not password:
-        pypirc_path = Path.home() / '.pypirc'
-        if pypirc_path.exists():
-            config = configparser.ConfigParser()
-            config.read(pypirc_path)
-
-            # 根据仓库 URL 确定配置节
-            section_name = 'pypi'
-            if args.repository_url:
-                if 'nexus' in args.repository_url.lower():
-                    section_name = 'nexus'
-                elif 'test.pypi.org' in args.repository_url.lower():
-                    section_name = 'testpypi'
-
-            if config.has_section(section_name):
-                if not username and config.has_option(section_name, 'username'):
-                    username = config.get(section_name, 'username')
-                if not password and config.has_option(section_name, 'password'):
-                    password = config.get(section_name, 'password')
-
-    # 3. 如果仍然缺少凭据且需要部署，交互式输入
-    if args.repository_url and not args.dry_run and (not username or not password):
-        if is_nexus:
-            logger.info(f"\n🔐 Nexus Repository Authentication Required")
-            logger.info(f"Repository: {args.repository_url}")
-            logger.info("-" * 50)
-
-            if not username:
-                username_input = input("Username (default: admin): ").strip()
-                username = username_input if username_input else "admin"
-                logger.info(f"Using username: {username}")
-
-            if not password:
-                password = getpass.getpass("Password: ")
-                if not password:
-                    logger.error("Password cannot be empty for Nexus deployment")
-                    raise ValueError("Password is required for Nexus deployment")
-
-            logger.info("-" * 50)
-        else:
-            # PyPI 或其他仓库
-            if not username or not password:
-                logger.info(f"\n🔐 Repository Authentication Required")
-                if is_pypi:
-                    logger.info("PyPI Repository: https://pypi.org/")
-                    logger.info("💡 Recommended: Use API tokens for better security")
-                    logger.info("   Get your token at: https://pypi.org/manage/account/token/")
-                elif is_test_pypi:
-                    logger.info("TestPyPI Repository: https://test.pypi.org/")
-                    logger.info("💡 Recommended: Use API tokens for better security")
-                    logger.info("   Get your token at: https://test.pypi.org/manage/account/token/")
-                else:
-                    logger.info(f"Repository: {args.repository_url}")
-                logger.info("-" * 60)
-
-                if not username:
-                    if is_pypi or is_test_pypi:
-                        logger.info("For API tokens, use '__token__' as username")
-                        username_input = input("Username (default: __token__): ").strip()
-                        username = username_input if username_input else "__token__"
-                    else:
-                        username = input("Username: ").strip()
-
-                if not password:
-                    if username == "__token__":
-                        password = getpass.getpass("API Token (pypi-...): ")
-                    else:
-                        password = getpass.getpass("Password: ")
-
-                print("-" * 60)
-
-    # 4. PyPI 默认处理 - 如果没有提供任何认证信息
-    if (is_pypi or is_test_pypi) and not args.dry_run and not username and not password:
-        logger.warning("No PyPI credentials provided!")
-        logger.info("You can:")
-        logger.info("   1. Set environment variables: TWINE_USERNAME, TWINE_PASSWORD")
-        logger.info("   2. Configure ~/.pypirc file")
-        logger.info("   3. Use --interactive flag for manual input")
-        logger.info("   4. Get API token from: https://pypi.org/manage/account/token/")
-
-        if not args.interactive:
-            use_interactive = input("\nProceed with interactive input? (y/N): ").strip().lower()
-            if use_interactive in ['y', 'yes']:
-                # 递归调用交互模式
-                args.interactive = True
-                return get_credentials(args)
-            else:
-                raise ValueError("Authentication required for PyPI deployment")
+        logger.info(f"Password/Token cannot be empty")
+        raise ValueError("Password/Token cannot be empty")
 
     return username, password
 
@@ -236,7 +120,13 @@ def parse_prerelease(version: str):
         minor = int(match.group(2))
         patch = int(match.group(3))
         prerelease_type = match.group(4)  # None if no prerelease
-        prerelease_version = int(match.group(5)) if match.group(5) else 1
+
+        if prerelease_type and match.group(5):
+            prerelease_version = int(match.group(5))
+        elif prerelease_type:
+            prerelease_version = 1
+        else:
+            prerelease_version = None
 
         return {
             'major': major,
@@ -249,3 +139,61 @@ def parse_prerelease(version: str):
     else:
         raise ValueError(f"Invalid version format: {version}")
 
+
+def get_pypirc_info():
+    """
+    Read and parse .pypirc file from user's home directory.
+    Returns a dictionary with repository configurations.
+    """
+    # Get the path to .pypirc file
+    home_dir = Path.home()
+    pypirc_path = home_dir / '.pypirc'
+
+    if not pypirc_path.exists():
+        print(f"No .pypirc file found at {pypirc_path}")
+        return None
+
+    # Parse the configuration file
+    config = configparser.ConfigParser()
+
+    try:
+        config.read(pypirc_path)
+
+        # Extract information
+        pypirc_info = {}
+
+        # Get index servers if available
+        if config.has_section('distutils') and config.has_option('distutils', 'index-servers'):
+            index_servers = config.get('distutils', 'index-servers').split()
+            pypirc_info['index_servers'] = index_servers
+
+        # Get repository configurations
+        repositories = {}
+        for section_name in config.sections():
+            if section_name != 'distutils':
+                repo_config = {}
+                for option in config.options(section_name):
+                    repo_config[option] = config.get(section_name, option)
+                repositories[section_name] = repo_config
+
+        pypirc_info['repositories'] = repositories
+        return pypirc_info
+    except Exception as e:
+        print(f"Error reading .pypirc file: {e}")
+        return None
+
+
+def load_config(pyproject_path: Path) -> Dict[str, Any]:
+    """load pyproject.toml"""
+    if not pyproject_path.exists():
+        raise FileNotFoundError(f"pyproject.toml not found at {pyproject_path}")
+
+    with open(pyproject_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    config = tomlkit.parse(content)
+    return config
+
+
+def save_config(config, pyproject_path: Path):
+    with open(pyproject_path, 'w', encoding='utf-8') as f:
+        f.write(tomlkit.dumps(config))

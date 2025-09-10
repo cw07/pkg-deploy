@@ -9,15 +9,17 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 
 
-from package_deploy.utils import logger
+from package_deploy.utils import logger, save_config
 
 
 @dataclass
 class DeployConfig:
     project_dir: Path
+    pyproject_path: Path
     package_name: str
     version_type: str
     use_cython: bool
+    repository_name: str
     repository_url: Optional[str] = None
     username: Optional[str] = None
     password: Optional[str] = None
@@ -25,21 +27,18 @@ class DeployConfig:
 
 
 class BuildStrategy(ABC):
-    """构建策略抽象基类"""
 
     @abstractmethod
     def build(self, config: DeployConfig, work_dir: Path) -> bool:
-        """执行构建"""
         pass
 
 
 class StandardBuildStrategy(BuildStrategy):
-    """标准构建策略"""
 
     def build(self, config: DeployConfig, project_dir: Path) -> bool:
         """使用标准 build 构建"""
         try:
-            cmd = [sys.executable, "-m", "build", str(project_dir)]
+            cmd = [sys.executable, "-m", "build", "-wheel"]
             logger.info(f"Running: {' '.join(cmd)}")
 
             result = subprocess.run(cmd, capture_output=True, text=True, cwd=project_dir)
@@ -57,20 +56,17 @@ class StandardBuildStrategy(BuildStrategy):
 
 
 class CythonBuildStrategy(BuildStrategy):
-    """Cython 构建策略"""
 
     def build(self, config: DeployConfig, project_dir: Path) -> bool:
-        """使用 Cython 编译构建"""
         try:
-            # 检查是否有 setup.py 或需要创建 Cython 构建配置
             self._setup_cython_build(project_dir)
+            self.create
 
-            # 使用 build 构建，但添加 Cython 支持
             cmd = [sys.executable, "-m", "build", str(project_dir)]
             logger.info(f"Running Cython build: {' '.join(cmd)}")
 
             env = os.environ.copy()
-            env['CYTHONIZE'] = '1'  # 环境变量指示使用 Cython
+            env['CYTHONIZE'] = '1'
 
             result = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=project_dir)
 
@@ -79,6 +75,7 @@ class CythonBuildStrategy(BuildStrategy):
                 return False
 
             logger.info("Cython build completed successfully")
+            os.remove("setup.py")
             return True
 
         except Exception as e:
@@ -86,12 +83,11 @@ class CythonBuildStrategy(BuildStrategy):
             return False
 
     def _setup_cython_build(self, project_dir: Path):
-        """设置 Cython 构建配置"""
         pyproject_path = project_dir / "pyproject.toml"
         if pyproject_path.exists():
             config = toml.load(pyproject_path)
 
-            # 添加 Cython 构建依赖
+            # Add Cython build dependency
             if 'build-system' not in config:
                 config['build-system'] = {}
 
@@ -99,15 +95,34 @@ class CythonBuildStrategy(BuildStrategy):
                 config['build-system']['requires'] = []
 
             cython_deps = ['setuptools', 'wheel', 'Cython']
+            requires = config['build-system']['requires']
             for dep in cython_deps:
-                if dep not in config['build-system']['requires']:
+                if not any(req.startswith(dep) for req in requires):
                     config['build-system']['requires'].append(dep)
 
             if 'build-backend' not in config['build-system']:
                 config['build-system']['build-backend'] = 'setuptools.build_meta'
 
-            # 保存修改
-            with open(pyproject_path, 'w', encoding='utf-8') as f:
-                toml.dump(config, f)
+            save_config(config, pyproject_path)
 
-
+    def create_setup_py_for_cython(self):
+        setup_py_content = '''
+        import os
+        from setuptools import setup, find_packages
+        from Cython.Build import cythonize
+        import glob
+        py_files = glob.glob("src/**/*.py", recursive=True)
+        py_files = [f for f in py_files if not f.endswith("__init__.py")]
+    
+        setup(
+            packages=find_packages(where="src"),
+            package_dir={"": "src"},
+            ext_modules=cythonize(
+                py_files,
+                compiler_directives={"language_level": "3"},
+            ),
+            zip_safe=False,
+        )
+        '''
+        with open('setup.py', 'w') as f:
+            f.write(setup_py_content)
