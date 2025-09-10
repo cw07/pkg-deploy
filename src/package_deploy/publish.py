@@ -137,40 +137,6 @@ class PackageDeploy:
         )
         self.setup_file_exist = (self.config.project_dir / "setup.py").exists()
 
-    @staticmethod
-    def check_require_package(cython: bool):
-        required_packages = ["build", "twine", "toml", "tomlkit"]
-        if cython:
-            required_packages.append("Cython")
-        if is_uv_venv():
-            required_packages.append("virtualenv")
-            setup_uv_compatibility()
-
-        missing_packages = []
-        for package in required_packages:
-            try:
-                __import__(package)
-            except ImportError:
-                missing_packages.append(package)
-
-        if missing_packages:
-            logger.error(f"Missing required packages: {', '.join(missing_packages)}")
-            logger.error(f"Install them with: pip install {' '.join(missing_packages)}")
-            raise ValueError("Missing required packages")
-
-    def check_git_status(self):
-        logger.info("Checking git status, --porcelain to make sure git repo is clean")
-        result = subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=self.config.project_dir,
-            capture_output=True,
-            text=True
-        )
-        if result.returncode != 0:
-            raise IOError(f"Git command failed: {result.stderr.strip()}")
-        if result.stdout.strip():
-            raise IOError(f"Git repo is NOT clean: \n{result.stdout}")
-
     def deploy(self):
         logger.info(f"Starting deployment")
         try:
@@ -195,6 +161,27 @@ class PackageDeploy:
             logger.error(f"Deployment failed: {e}")
             return False
 
+    @staticmethod
+    def check_require_package(cython: bool):
+        required_packages = ["build", "twine", "toml", "tomlkit"]
+        if cython:
+            required_packages.append("Cython")
+        if is_uv_venv():
+            required_packages.append("virtualenv")
+            setup_uv_compatibility()
+
+        missing_packages = []
+        for package in required_packages:
+            try:
+                __import__(package)
+            except ImportError:
+                missing_packages.append(package)
+
+        if missing_packages:
+            logger.error(f"Missing required packages: {', '.join(missing_packages)}")
+            logger.error(f"Install them with: pip install {' '.join(missing_packages)}")
+            raise ValueError("Missing required packages")
+
     def cleanup_build(self):
         logger.info('Deleting build, dist and egg-info')
         shutil.rmtree('dist', ignore_errors=True)
@@ -209,6 +196,19 @@ class PackageDeploy:
             Path("setup.py").unlink(missing_ok=True)
         for file_path in c_files:
             Path(file_path).unlink(missing_ok=True)
+
+    def check_git_status(self):
+        logger.info("Checking git status, --porcelain to make sure git repo is clean")
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=self.config.project_dir,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0:
+            raise IOError(f"Git command failed: {result.stderr.strip()}")
+        if result.stdout.strip():
+            raise IOError(f"Git repo is NOT clean: \n{result.stdout}")
 
     @staticmethod
     def git_push():

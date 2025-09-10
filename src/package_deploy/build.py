@@ -1,12 +1,10 @@
 import os
 import sys
-import time
-from typing import Optional
-from dataclasses import dataclass
-
 import toml
 import subprocess
 from pathlib import Path
+from typing import Optional
+from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
 from package_deploy.utils import logger, save_config
@@ -63,7 +61,6 @@ class CythonBuildStrategy(BuildStrategy):
                 raise ValueError(f"Cython build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
 
             logger.info("Cython build completed successfully")
-            time.sleep(0.1)
             return True
 
         except Exception as e:

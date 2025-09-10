@@ -26,7 +26,7 @@ class NexusDeploy(Deploy):
     @staticmethod
     def get_wheel_files(config: DeployConfig):
         wheel_files = []
-        for binary in (config.project_dir / 'dict').iterdir():
+        for binary in (config.project_dir / 'dist').iterdir():
             if config.package_name.replace("-", "_") in binary.name and binary.suffix == '.whl':
                 wheel_files.append(binary.name)
         if len(wheel_files) != 1:
