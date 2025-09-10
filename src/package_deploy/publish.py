@@ -9,8 +9,12 @@ from pathlib import Path
 
 from package_deploy.deploy import Deploy, NexusDeploy
 from package_deploy.version_managment import VersionManager
+from package_deploy.utils import get_pypirc_info, get_credentials, is_uv_venv
 from package_deploy.build import DeployConfig, CythonBuildStrategy, StandardBuildStrategy
-from package_deploy.utils import logger, get_pypirc_info, get_credentials, setup_uv_compatibility, is_uv_venv
+
+
+logger = logging.getLogger(__name__)
+
 
 def parse_args(args):
     parser = argparse.ArgumentParser(

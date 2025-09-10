@@ -3,12 +3,15 @@
 Modern Python Package Deployment Tool
 """
 import sys
+import logging
 import subprocess
 from pathlib import Path
 from abc import ABC, abstractmethod
 
-from package_deploy.utils import logger
 from package_deploy.build import DeployConfig
+
+
+logger = logging.getLogger(__name__)
 
 
 class Deploy(ABC):

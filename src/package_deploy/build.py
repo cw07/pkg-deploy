@@ -1,13 +1,17 @@
 import os
 import sys
 import toml
+import logging
 import subprocess
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
-from package_deploy.utils import logger, save_config, is_uv_venv
+from package_deploy.utils import save_config, is_uv_venv
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass

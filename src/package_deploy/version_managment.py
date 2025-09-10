@@ -1,6 +1,10 @@
+import logging
 from pathlib import Path
 
-from package_deploy.utils import parse_prerelease, logger, load_config, save_config
+from package_deploy.utils import parse_prerelease, load_config, save_config
+
+
+logger = logging.getLogger(__name__)
 
 
 class VersionManager:
