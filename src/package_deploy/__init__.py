@@ -139,7 +139,6 @@ class PackageDeploy:
         self.config = DeployConfig(
             project_dir=args.project_dir,
             pyproject_path=args.project_dir / "pyproject.toml",
-            package_name=args.package_name,
             version_type=args.version_type,
             use_cython=args.cython,
             repository_name=args.repository_name,
@@ -152,7 +151,7 @@ class PackageDeploy:
         self.version_manager = VersionManager(self.config.pyproject_path)
 
     def deploy(self):
-        logger.info(f"Starting deployment for package: {self.config.package_name}")
+        logger.info(f"Starting deployment")
 
         try:
             new_version = self.version_manager.bump_version(self.config.version_type)

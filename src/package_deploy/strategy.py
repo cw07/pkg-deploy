@@ -16,7 +16,6 @@ from package_deploy.utils import logger, save_config
 class DeployConfig:
     project_dir: Path
     pyproject_path: Path
-    package_name: str
     version_type: str
     use_cython: bool
     repository_name: str
