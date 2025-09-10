@@ -10,10 +10,10 @@ requires-python = ">=3.8"
 dependencies = [
     "toml",
     "tomlkit",
-    "virtualenv",
     "build",
     "twine",
-    "Cython"
+    "Cython",
+    "setuptools>=70",
 ]
 
 [tool.setuptools]
