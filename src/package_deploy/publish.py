@@ -156,10 +156,23 @@ class PackageDeploy:
             logger.error(f"Install them with: pip install {' '.join(missing_packages)}")
             raise ValueError("Missing required packages")
 
+    def check_git_status(self):
+        logger.info("Checking git status, --porcelain to make sure git repo is clean")
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=self.config.project_dir,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0:
+            raise IOError(f"Git command failed: {result.stderr.strip()}")
+        if result.stdout.strip():
+            raise IOError(f"Git repo is NOT clean: \n{result.stdout}")
+
     def deploy(self):
         logger.info(f"Starting deployment")
-
         try:
+            self.check_git_status()
             new_version = self.version_manager.bump_version(self.config.version_type)
             logger.info(f"New version: {new_version}")
 
