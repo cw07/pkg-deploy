@@ -43,8 +43,7 @@ class StandardBuildStrategy(BuildStrategy):
             result = subprocess.run(cmd, capture_output=True, text=True, cwd=project_dir)
 
             if result.returncode != 0:
-                logger.error(f"Build failed: {result.stderr}")
-                return False
+                raise ValueError(f"Build failed: {result.stderr}")
 
             logger.info("Standard build completed successfully")
             return True
