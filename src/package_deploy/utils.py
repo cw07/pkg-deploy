@@ -150,8 +150,7 @@ def get_pypirc_info():
     pypirc_path = home_dir / '.pypirc'
 
     if not pypirc_path.exists():
-        print(f"No .pypirc file found at {pypirc_path}")
-        return None
+        raise FileNotFoundError(f"No .pypirc file found at {pypirc_path}")
 
     # Parse the configuration file
     config = configparser.ConfigParser()
@@ -175,6 +174,8 @@ def get_pypirc_info():
                 for option in config.options(section_name):
                     repo_config[option] = config.get(section_name, option)
                 repositories[section_name] = repo_config
+        if not repositories:
+            raise ValueError(f"No repositories configuration found in {pypirc_path}")
 
         pypirc_info['repositories'] = repositories
         return pypirc_info
