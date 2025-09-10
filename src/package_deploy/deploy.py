@@ -204,6 +204,7 @@ class PackageDeploy:
             password=password,
             dry_run=args.dry_run
         )
+        self.setup_file_exist = (self.config.project_dir / "setup.py").exists()
         self.version_manager = VersionManager(self.config.pyproject_path)
 
     def deploy(self):
@@ -216,9 +217,10 @@ class PackageDeploy:
             new_version = self.version_manager.bump_version(self.config.version_type)
             logger.info(f"New version: {new_version}")
 
-            build_strategy = (CythonBuildStrategy()
-                              if self.config.use_cython
-                              else StandardBuildStrategy())
+            if self.config.use_cython:
+                build_strategy = CythonBuildStrategy()
+            else:
+                build_strategy = StandardBuildStrategy()
 
             build_strategy.build(self.config, self.config.project_dir)
 
@@ -245,11 +247,10 @@ class PackageDeploy:
         launcher_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
         directory = os.path.join(launcher_dir, 'src', self.config.package_name.replace("-", "_"))
         c_files = glob.glob(os.path.join(directory, '**', '*.c'), recursive=True)
+        if not self.setup_file_exist:
+            Path("setup.py").unlink(missing_ok=True)
         for file_path in c_files:
-            try:
-                os.remove(file_path)
-            except FileNotFoundError:
-                pass
+            Path(file_path).unlink(missing_ok=True)
 
     @staticmethod
     def git_push():

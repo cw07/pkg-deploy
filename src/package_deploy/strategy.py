@@ -75,7 +75,6 @@ class CythonBuildStrategy(BuildStrategy):
                 return False
 
             logger.info("Cython build completed successfully")
-            os.remove("setup.py")
             return True
 
         except Exception as e:
