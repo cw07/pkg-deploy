@@ -144,7 +144,6 @@ class PackageDeploy:
             required_packages.append("Cython")
         if is_uv_venv():
             setup_uv_compatibility()
-            required_packages.append("virtualenv")
 
         missing_packages = []
         for package in required_packages:
