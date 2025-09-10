@@ -13,6 +13,10 @@ from package_deploy.utils import get_pypirc_info, get_credentials, is_uv_venv
 from package_deploy.build import DeployConfig, CythonBuildStrategy, StandardBuildStrategy
 
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 
