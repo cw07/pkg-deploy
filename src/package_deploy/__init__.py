@@ -106,21 +106,7 @@ class PackageDeploy:
         if args.verbose:
             logging.getLogger().setLevel(logging.DEBUG)
 
-        required_packages = ["build", "twine", "toml"]
-        if args.cython:
-            required_packages.append("Cython")
-
-        missing_packages = []
-        for package in required_packages:
-            try:
-                __import__(package)
-            except ImportError:
-                missing_packages.append(package)
-
-        if missing_packages:
-            logger.error(f"Missing required packages: {', '.join(missing_packages)}")
-            logger.info(f"Install them with: pip install {' '.join(missing_packages)}")
-            sys.exit(1)
+        self.check_require_package(args.cython)
 
         pypirc_info = get_pypirc_info()
         repos = pypirc_info["repositories"]
@@ -136,9 +122,13 @@ class PackageDeploy:
             url = args.repository_url
             username, password = get_credentials(args)
 
+        pyproject_path = args.project_dir / "pyproject.toml"
+
+        self.version_manager = VersionManager(pyproject_path)
         self.config = DeployConfig(
+            package_name=self.version_manager.config["project"]["name"],
             project_dir=args.project_dir,
-            pyproject_path=args.project_dir / "pyproject.toml",
+            pyproject_path=pyproject_path,
             version_type=args.version_type,
             use_cython=args.cython,
             repository_name=args.repository_name,
@@ -148,7 +138,24 @@ class PackageDeploy:
             dry_run=args.dry_run
         )
         self.setup_file_exist = (self.config.project_dir / "setup.py").exists()
-        self.version_manager = VersionManager(self.config.pyproject_path)
+
+    @staticmethod
+    def check_require_package(cython: bool):
+        required_packages = ["build", "twine", "toml"]
+        if cython:
+            required_packages.append("Cython")
+
+        missing_packages = []
+        for package in required_packages:
+            try:
+                __import__(package)
+            except ImportError:
+                missing_packages.append(package)
+
+        if missing_packages:
+            logger.error(f"Missing required packages: {', '.join(missing_packages)}")
+            logger.error(f"Install them with: pip install {' '.join(missing_packages)}")
+            raise ValueError("Missing required packages")
 
     def deploy(self):
         logger.info(f"Starting deployment")
@@ -162,16 +169,13 @@ class PackageDeploy:
             else:
                 build_strategy = StandardBuildStrategy()
 
-            build_strategy.build(self.config, self.config.project_dir)
-
-            deploy_strategy = self._get_deploy_strategy(self.config)
-
-            dist_dir = self.config.project_dir / "dist"
-            deploy_strategy.deploy(self.config, dist_dir)
+            if build_strategy.build(self.config, self.config.project_dir):
+                deploy_strategy = self._get_deploy_strategy(self.config)
+                dist_dir = self.config.project_dir / "dist"
+                if deploy_strategy.deploy(self.config, dist_dir):
+                    self.git_push()
 
             self.cleanup_build()
-            self.git_push()
-
             logger.info('Deploy Complete')
         except Exception as e:
             logger.error(f"Deployment failed: {e}")

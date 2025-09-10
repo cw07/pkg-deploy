@@ -14,6 +14,7 @@ from package_deploy.utils import logger, save_config
 
 @dataclass
 class DeployConfig:
+    package_name: str
     project_dir: Path
     pyproject_path: Path
     version_type: str
@@ -37,7 +38,7 @@ class StandardBuildStrategy(BuildStrategy):
     def build(self, config: DeployConfig, project_dir: Path) -> bool:
         """使用标准 build 构建"""
         try:
-            cmd = [sys.executable, "-m", "build", "-wheel"]
+            cmd = [sys.executable, "-m", "build", "--wheel"]
             logger.info(f"Running: {' '.join(cmd)}")
 
             result = subprocess.run(cmd, capture_output=True, text=True, cwd=project_dir)
