@@ -1,17 +1,16 @@
-import argparse
-import glob
-import logging
 import os
-import shutil
-import subprocess
 import sys
+import glob
+import shutil
+import logging
+import argparse
+import subprocess
 from pathlib import Path
-from typing import Optional
 
 from package_deploy.deploy import Deploy, NexusDeploy
 from package_deploy.version_managment import VersionManager
 from package_deploy.utils import logger, get_pypirc_info, get_credentials, save_config
-from package_deploy.strategy import DeployConfig, CythonBuildStrategy, StandardBuildStrategy
+from package_deploy.build import DeployConfig, CythonBuildStrategy, StandardBuildStrategy
 
 
 def parse_args(args):

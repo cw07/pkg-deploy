@@ -8,7 +8,7 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 
 from package_deploy.utils import logger
-from package_deploy.strategy import DeployConfig
+from package_deploy.build import DeployConfig
 
 
 class Deploy(ABC):
@@ -23,7 +23,8 @@ class Deploy(ABC):
 class NexusDeploy(Deploy):
     """Nexus Deploy"""
 
-    def get_wheel_files(self, config: DeployConfig):
+    @staticmethod
+    def get_wheel_files(config: DeployConfig):
         wheel_files = []
         for binary in (config.project_dir / 'dict').iterdir():
             if config.package_name.replace("-", "_") in binary.name and binary.suffix == '.whl':
