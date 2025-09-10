@@ -15,7 +15,7 @@ from package_deploy.build import DeployConfig, CythonBuildStrategy, StandardBuil
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
+    format='%(asctime)s - %(name)s [%(levelname)s] %(filename)s:%(lineno)d:  %(message)s'
 )
 logger = logging.getLogger(__name__)
 
