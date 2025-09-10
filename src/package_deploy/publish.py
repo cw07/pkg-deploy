@@ -9,9 +9,8 @@ from pathlib import Path
 
 from package_deploy.deploy import Deploy, NexusDeploy
 from package_deploy.version_managment import VersionManager
-from package_deploy.utils import logger, get_pypirc_info, get_credentials
 from package_deploy.build import DeployConfig, CythonBuildStrategy, StandardBuildStrategy
-
+from package_deploy.utils import logger, get_pypirc_info, get_credentials, setup_uv_compatibility, is_uv_venv
 
 def parse_args(args):
     parser = argparse.ArgumentParser(
@@ -143,6 +142,9 @@ class PackageDeploy:
         required_packages = ["build", "twine", "toml"]
         if cython:
             required_packages.append("Cython")
+        if is_uv_venv():
+            setup_uv_compatibility()
+            required_packages.append("virtualenv")
 
         missing_packages = []
         for package in required_packages:

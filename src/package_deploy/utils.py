@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import toml
 import tomlkit
 import logging
@@ -14,6 +15,33 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def is_uv_venv() -> bool:
+    """Detect if the current virtual environment was created by uv (supports versioned marker)."""
+    if not hasattr(sys, 'prefix') or not sys.prefix:
+        return False
+    pyvenv_cfg = Path(sys.prefix) / "pyvenv.cfg"
+    if not pyvenv_cfg.exists():
+        return False
+    try:
+        with open(pyvenv_cfg, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.lower().startswith("uv ="):
+                    logger.info("Detected uv-managed Python.")
+                    return True
+    except Exception:
+        pass
+    return False
+
+def setup_uv_compatibility():
+    if is_uv_venv():
+        logger.info("Setting PIP_USE_VIRTUALENV=1 for build compatibility.")
+        os.environ["PIP_USE_VIRTUALENV"] = "1"
+        return True
+    else:
+        return False
 
 
 def create_sample_pyproject_toml():

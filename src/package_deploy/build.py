@@ -35,23 +35,13 @@ class BuildStrategy(ABC):
 class StandardBuildStrategy(BuildStrategy):
 
     def build(self, config: DeployConfig, project_dir: Path) -> bool:
-        """使用标准 build 构建"""
-        try:
-            cmd = [sys.executable, "-m", "build", "--wheel"]
-            logger.info(f"Running: {' '.join(cmd)}")
-
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=project_dir)
-
-            if result.returncode != 0:
-                raise ValueError(f"Build failed: {result.stderr}")
-
-            logger.info("Standard build completed successfully")
-            return True
-
-        except Exception as e:
-            logger.error(f"Build error: {e}")
-            return False
-
+        cmd = [sys.executable, "-m", "build", "--wheel"]
+        logger.info(f"Running: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=project_dir)
+        if result.returncode != 0:
+           raise ValueError(f"Build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
+        logger.info("Standard build completed successfully")
+        return True
 
 class CythonBuildStrategy(BuildStrategy):
 
