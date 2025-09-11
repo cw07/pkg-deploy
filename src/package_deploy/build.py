@@ -9,7 +9,7 @@ from typing import Optional, Dict
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
-from package_deploy.utils import save_config, is_uv_venv, ensure_uv_installed
+from package_deploy.utils import save_config, is_uv_venv, ensure_uv_installed, load_config
 
 
 logger = logging.getLogger(__name__)
@@ -83,7 +83,7 @@ class CythonBuildStrategy(BuildStrategy):
     def _setup_cython_build(project_dir: Path):
         pyproject_path = project_dir / "pyproject.toml"
         if pyproject_path.exists():
-            config = toml.load(pyproject_path)
+            config = load_config(pyproject_path)
 
             # Add Cython build dependency
             if 'build-system' not in config:
