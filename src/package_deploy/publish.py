@@ -161,7 +161,7 @@ class PackageDeploy:
                 deploy_strategy = self._get_deploy_strategy(self.config)
                 dist_dir = self.config.project_dir / "dist"
                 if deploy_strategy.deploy(self.config, dist_dir):
-                    self.git_push()
+                    self.git_push(new_version=new_version)
 
             self.cleanup_build()
             logger.info('Deploy Complete')
@@ -216,9 +216,11 @@ class PackageDeploy:
             raise IOError(f"Git repo is NOT clean: \n{result.stdout}")
 
     @staticmethod
-    def git_push():
+    def git_push(new_version: str):
         logger.info('Pushing to github')
         try:
+            subprocess.check_output(['git', 'add', 'pyproject.toml'], stderr=subprocess.STDOUT)
+            subprocess.check_output(['git', 'commit', '-m', f'Bump version to {new_version}'], stderr=subprocess.STDOUT)
             subprocess.check_output(['git', 'pull'], stderr=subprocess.STDOUT)
             subprocess.check_output(['git', 'push', '--tags', '--force'], stderr=subprocess.STDOUT)
             subprocess.check_output(['git', 'push'], stderr=subprocess.STDOUT)
