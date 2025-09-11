@@ -157,13 +157,16 @@ class PackageDeploy:
             else:
                 build_strategy = StandardBuildStrategy()
 
+            deployed = False
             if build_strategy.build(self.config, self.version_manager.toml_config):
                 deploy_strategy = self._get_deploy_strategy(self.config)
                 dist_dir = self.config.project_dir / "dist"
-                if deploy_strategy.deploy(self.config, dist_dir):
-                    self.git_push(new_version=new_version)
+                deployed = deploy_strategy.deploy(self.config, dist_dir)
 
             self.cleanup_build()
+            if deployed:
+                self.git_push(new_version=new_version)
+
             logger.info('Deploy Complete')
         except Exception as e:
             logger.error(f"Deployment failed: {e}")
