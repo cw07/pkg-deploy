@@ -16,7 +16,7 @@ dependencies = [
     "setuptools>=70",
 ]
 authors = [
-    { name = "Chen Wang", email = ""},
+    { name = "Chen Wang", email = "wangchen9617@gmail.com"},
 ]
 
 
