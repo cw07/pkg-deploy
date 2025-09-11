@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "package-deploy"
-version = "0.1.0"
+version = "0.1.1"
 description = "Modern Python Package Deployment Tool"
 requires-python = ">=3.8"
 authors = [
@@ -18,10 +18,6 @@ dependencies = [
     "Cython",
     "setuptools>=70",
 ]
-
-[project.scripts]
-update = "scripts.daily_update:main"
-
 
 [tool.setuptools]
 package-dir = {"" = "src"}
