@@ -219,11 +219,10 @@ class PackageDeploy:
     def git_push(new_version: str):
         logger.info('Pushing to github')
         try:
+            subprocess.check_output(['git', 'pull', '--rebase'], stderr=subprocess.STDOUT)
             subprocess.check_output(['git', 'add', 'pyproject.toml'], stderr=subprocess.STDOUT)
             subprocess.check_output(['git', 'commit', '-m', f'Bump version to {new_version}'], stderr=subprocess.STDOUT)
-            subprocess.check_output(['git', 'pull'], stderr=subprocess.STDOUT)
-            subprocess.check_output(['git', 'push', '--tags', '--force'], stderr=subprocess.STDOUT)
-            subprocess.check_output(['git', 'push'], stderr=subprocess.STDOUT)
+            subprocess.check_output(['git', 'push', '--follow-tags'], stderr=subprocess.STDOUT)
         except Exception as ex:
             if isinstance(ex, subprocess.CalledProcessError):
                 logger.error(ex.output)
