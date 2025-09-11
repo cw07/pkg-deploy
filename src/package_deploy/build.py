@@ -1,6 +1,6 @@
 import os
 import sys
-import toml
+import copy
 import logging
 import textwrap
 import subprocess
@@ -61,46 +61,53 @@ class CythonBuildStrategy(BuildStrategy):
 
     def build(self, config: DeployConfig, toml_config: Optional[Dict]=None) -> bool:
         try:
-            self._setup_cython_build(config.project_dir)
+            self.prepare_pyproject_for_cython_build(config.project_dir, toml_config)
             self.create_setup_py_for_cython(toml_config, config.project_dir)
             cmd = self.build_cmd()
             logger.info(f"Running Cython build: {' '.join(cmd)}")
             env = os.environ.copy()
             env['CYTHONIZE'] = '1'
             result = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=config.project_dir)
-
             if result.returncode != 0:
                 raise ValueError(f"Cython build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
-
             logger.info("Cython build completed successfully")
             return True
-
         except Exception as e:
             logger.error(f"Cython build error: {e}")
             return False
+        finally:
+            self.restore_pyproject_toml(project_dir=config.project_dir, original_config=toml_config)
 
     @staticmethod
-    def _setup_cython_build(project_dir: Path):
+    def prepare_pyproject_for_cython_build(project_dir: Path, toml_config: Dict):
         pyproject_path = project_dir / "pyproject.toml"
         if pyproject_path.exists():
-            config = load_config(pyproject_path)
+            new_config = copy.deepcopy(toml_config)
 
             # Add Cython build dependency
-            if 'build-system' not in config:
-                config['build-system'] = {}
+            if 'build-system' not in new_config:
+                new_config['build-system'] = {}
 
-            if 'requires' not in config['build-system']:
-                config['build-system']['requires'] = []
+            if 'requires' not in new_config['build-system']:
+                new_config['build-system']['requires'] = []
 
             cython_deps = ['setuptools', 'Cython']
-            requires = config['build-system']['requires']
+            requires = new_config['build-system']['requires']
             for dep in cython_deps:
                 if not any(req.startswith(dep) for req in requires):
-                    config['build-system']['requires'].append(dep)
+                    new_config['build-system']['requires'].append(dep)
 
-            if 'build-backend' not in config['build-system']:
-                config['build-system']['build-backend'] = 'setuptools.build_meta'
-            save_config(config, pyproject_path)
+            if 'build-backend' not in new_config['build-system'] or new_config['build-system'][
+                'build-backend'] != 'setuptools.build_meta':
+                new_config['build-system']['build-backend'] = 'setuptools.build_meta'
+            save_config(new_config, pyproject_path)
+
+    @staticmethod
+    def restore_pyproject_toml(project_dir: Path, original_config: Dict):
+        pyproject_path = project_dir / "pyproject.toml"
+        if original_config:
+            save_config(original_config, pyproject_path)
+            logger.info("Restored original pyproject.toml")
 
     @staticmethod  # cw07*
     def create_setup_py_for_cython(toml_config: Dict, project_dir: Path):
