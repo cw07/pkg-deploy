@@ -113,8 +113,10 @@ class CythonBuildStrategy(BuildStrategy):
     def create_setup_py_for_cython(toml_config: Dict, project_dir: Path):
         author_names = ", ".join([p["name"] for p in toml_config["project"]["authors"]])
         author_emails = ", ".join(p["email"] for p in toml_config["project"]["authors"])
-        entry_points = ", ".join(f"{k}={v}" for k, v in toml_config["project"]["scripts"].items())
-
+        if "scripts" in toml_config["project"]:
+            entry_points = ", ".join(f"{k}={v}" for k, v in toml_config["project"]["scripts"].items())
+        else:
+            entry_points = ""
         setup_py_content = textwrap.dedent(f'''
         import os
         import glob
