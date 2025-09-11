@@ -19,7 +19,6 @@ class Deploy(ABC):
 
     @abstractmethod
     def deploy(self, config: DeployConfig, dist_dir: Path) -> bool:
-        """执行部署"""
         pass
 
 
@@ -60,14 +59,11 @@ class NexusDeploy(Deploy):
                 if config.password:
                     cmd.extend(["--password", config.password])
 
-            cmd.append("--skip-existing")
-
             logger.info(f"Running: {' '.join(cmd)}")
             result = subprocess.run(cmd, capture_output=True, text=True)
 
             if result.returncode != 0:
-                logger.error(f"Nexus deploy failed: {result.stderr}")
-                return False
+                raise ValueError(f"Nexus build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
 
             logger.info("Package deployed to Nexus successfully")
             return True

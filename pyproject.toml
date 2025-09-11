@@ -15,6 +15,10 @@ dependencies = [
     "Cython",
     "setuptools>=70",
 ]
+authors = [
+    { name = "Chen Wang", email = ""},
+]
+
 
 [tool.setuptools]
 package-dir = {"" = "src"}

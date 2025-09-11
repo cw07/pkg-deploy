@@ -2,9 +2,10 @@ import os
 import sys
 import toml
 import logging
+import textwrap
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
@@ -41,16 +42,16 @@ class BuildStrategy(ABC):
         return cmd
 
     @abstractmethod
-    def build(self, config: DeployConfig, work_dir: Path) -> bool:
+    def build(self, config: DeployConfig, toml_config: Optional[Dict]=None) -> bool:
         pass
 
 
 class StandardBuildStrategy(BuildStrategy):
 
-    def build(self, config: DeployConfig, project_dir: Path) -> bool:
+    def build(self, config: DeployConfig, toml_config: Optional[Dict]=None) -> bool:
         cmd = self.build_cmd()
         logger.info(f"Running: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True, cwd=project_dir)
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=config.project_dir)
         if result.returncode != 0:
            raise ValueError(f"Build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
         logger.info("Standard build completed successfully")
@@ -58,15 +59,15 @@ class StandardBuildStrategy(BuildStrategy):
 
 class CythonBuildStrategy(BuildStrategy):
 
-    def build(self, config: DeployConfig, project_dir: Path) -> bool:
+    def build(self, config: DeployConfig, toml_config: Optional[Dict]=None) -> bool:
         try:
-            self._setup_cython_build(project_dir)
-            self.create_setup_py_for_cython()
+            self._setup_cython_build(config.project_dir)
+            self.create_setup_py_for_cython(toml_config, config.project_dir)
             cmd = self.build_cmd()
             logger.info(f"Running Cython build: {' '.join(cmd)}")
             env = os.environ.copy()
             env['CYTHONIZE'] = '1'
-            result = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=project_dir)
+            result = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=config.project_dir)
 
             if result.returncode != 0:
                 raise ValueError(f"Cython build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
@@ -78,7 +79,8 @@ class CythonBuildStrategy(BuildStrategy):
             logger.error(f"Cython build error: {e}")
             return False
 
-    def _setup_cython_build(self, project_dir: Path):
+    @staticmethod
+    def _setup_cython_build(project_dir: Path):
         pyproject_path = project_dir / "pyproject.toml"
         if pyproject_path.exists():
             config = toml.load(pyproject_path)
@@ -98,27 +100,66 @@ class CythonBuildStrategy(BuildStrategy):
 
             if 'build-backend' not in config['build-system']:
                 config['build-system']['build-backend'] = 'setuptools.build_meta'
-
             save_config(config, pyproject_path)
 
-    def create_setup_py_for_cython(self):
-        setup_py_content = '''
+    @staticmethod  # cw07*
+    def create_setup_py_for_cython(toml_config: Dict, project_dir: Path):
+        author_names = ", ".join([p["name"] for p in toml_config["project"]["authors"]])
+        author_emails = ", ".join(p["email"] for p in toml_config["project"]["authors"])
+        entry_points = ", ".join(f"{k}={v}" for k, v in toml_config["project"]["scripts"].items())
+
+        setup_py_content = textwrap.dedent(f'''
         import os
-        from setuptools import setup, find_packages
-        from Cython.Build import cythonize
         import glob
-        py_files = glob.glob("src/**/*.py", recursive=True)
+        from Cython.Build import cythonize
+        from setuptools import setup, find_packages
+        from setuptools.dist import Distribution
+        from setuptools.command.build_py import build_py as _build_py
+    
+        py_files = glob.glob("src/**/**/*.py", recursive=True)
         py_files = [f for f in py_files if not f.endswith("__init__.py")]
     
+        class build_py(_build_py):
+            def find_package_modules(self, package, package_dir):
+                modules = super().find_package_modules(package, package_dir)
+                if self.distribution.ext_modules:
+                    # Get the list of compiled module names
+                    compiled_modules = {{ext.name for ext in self.distribution.ext_modules}}
+                    # Filter out the modules that are compiled
+                    modules = [
+                        (pkg, mod, file) for (pkg, mod, file) in modules
+                        if f"{{pkg}}.{{mod}}" not in compiled_modules
+                    ]
+                return modules
+    
+        class BinaryDistribution(Distribution):
+            def has_ext_modules(self):
+                return True
+    
         setup(
+            name="{toml_config["project"]["name"]}",
+            version="{toml_config["project"]["version"]}",
+            author="{author_names}",
+            author_email="{author_emails}",
+            description="{toml_config["project"]["description"]}",
+            python_requires="{toml_config["project"]["requires-python"]}",
+            install_requires={toml_config["project"]["dependencies"]},
+            entry_points={{
+                'console_scripts': [{entry_points}]
+            }},
             packages=find_packages(where="src"),
-            package_dir={"": "src"},
+            package_dir={{"": "src"}},
+            include_package_data=True,
             ext_modules=cythonize(
                 py_files,
-                compiler_directives={"language_level": "3"},
+                compiler_directives={{'language_level': "3"}},
             ),
-            zip_safe=False,
+            distclass=BinaryDistribution,
+            setup_requires=["cython>=3.1"],
+            cmdclass={{'build_py': build_py}},
+            zip_safe=False
         )
-        '''
-        with open('setup.py', 'w') as f:
+        ''').strip()
+
+        with open(project_dir / "setup.py", 'w') as f:
             f.write(setup_py_content)

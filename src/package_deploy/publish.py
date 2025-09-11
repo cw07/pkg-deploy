@@ -131,7 +131,7 @@ class PackageDeploy:
 
         self.version_manager = VersionManager(pyproject_path)
         self.config = DeployConfig(
-            package_name=self.version_manager.config["project"]["name"],
+            package_name=self.version_manager.toml_config["project"]["name"],
             project_dir=args.project_dir,
             pyproject_path=pyproject_path,
             version_type=args.version_type,
@@ -157,7 +157,7 @@ class PackageDeploy:
             else:
                 build_strategy = StandardBuildStrategy()
 
-            if build_strategy.build(self.config, self.config.project_dir):
+            if build_strategy.build(self.config, self.version_manager.toml_config):
                 deploy_strategy = self._get_deploy_strategy(self.config)
                 dist_dir = self.config.project_dir / "dist"
                 if deploy_strategy.deploy(self.config, dist_dir):

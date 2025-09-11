@@ -12,10 +12,10 @@ class VersionManager:
 
     def __init__(self, pyproject_path: Path):
         self.pyproject_path = pyproject_path
-        self.config = load_config(pyproject_path)
+        self.toml_config = load_config(pyproject_path)
 
     def get_current_version(self) -> str:
-        return self.config['project']['version']
+        return self.toml_config['project']['version']
 
     def bump_version(self, version_type: str) -> str:
         current_version = self.get_current_version()
@@ -96,8 +96,8 @@ class VersionManager:
         else:
             new_version = f"{major}.{minor}.{patch}"
 
-        self.config['project']['version'] = new_version
-        save_config(self.config, self.pyproject_path)
+        self.toml_config['project']['version'] = new_version
+        save_config(self.toml_config, self.pyproject_path)
 
         logger.info(f"Version bumped from {current_version} to {new_version}")
         return new_version
