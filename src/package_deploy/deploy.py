@@ -197,7 +197,7 @@ class PackageDeploy:
             raise ValueError("Missing required packages")
 
     def cleanup_build(self):
-        logger.info('Deleting build, dist and egg-info')
+        logger.info('Deleting build, dist and egg-info files after deployment')
         shutil.rmtree('dist', ignore_errors=True)
         shutil.rmtree('build', ignore_errors=True)
         shutil.rmtree(f'src/{self.config.package_name}.egg-info', ignore_errors=True)
@@ -226,7 +226,6 @@ class PackageDeploy:
 
     @staticmethod
     def git_push(new_version: str):
-        logger.info('Pushing to github')
         try:
             subprocess.check_output(['git', 'add', '.'], stderr=subprocess.STDOUT)
             subprocess.check_output(['git', 'commit', '-m', f'Bump version to {new_version}'], stderr=subprocess.STDOUT)
@@ -234,6 +233,7 @@ class PackageDeploy:
             subprocess.check_output(['git', 'tag', '-a', tag_name, '-m', f'Release {tag_name}'], stderr=subprocess.STDOUT)
             logger.info(f"Created Git tag: {tag_name}")
             subprocess.check_output(['git', 'push', '--follow-tags'], stderr=subprocess.STDOUT)
+            logger.info('Pushing to github')
         except subprocess.CalledProcessError as ex:
             logger.error(f"Git command failed: {ex.output.decode()}")
             logger.warning('Failed to push bump version commit. Please push manually.')
