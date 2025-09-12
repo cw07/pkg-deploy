@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from ..package_deploy.utils import parse_prerelease, load_config, save_config
+from .utils import parse_prerelease, load_config, save_config
 
 
 logger = logging.getLogger(__name__)

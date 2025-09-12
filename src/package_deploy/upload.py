@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 from abc import ABC, abstractmethod
 
-from ..package_deploy.build import DeployConfig
+from .build import DeployConfig
 
 
 logger = logging.getLogger(__name__)
