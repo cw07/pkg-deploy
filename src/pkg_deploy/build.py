@@ -171,9 +171,9 @@ class CythonBuildStrategy(BuildStrategy):
             version="{toml_config["project"]["version"]}",
             {f"author='{author_names}'," if author_names else ""}
             {f"author_email='{author_emails}'," if author_emails else ""}
-            {f"description='{toml_config["project"]["description"]}'," if toml_config["project"].get("description", "") else ""}
-            {f"python_requires='{toml_config["project"]["requires-python"]}'," if toml_config["project"].get("requires-python") else ""}
-            {f"install_requires={toml_config["project"]["dependencies"]}," if toml_config["project"].get("dependencies") and len(toml_config["project"]["dependencies"]) > 0 else ""}
+            {f"description='{toml_config['project']['description']}'," if toml_config["project"].get("description", "") else ""}
+            {f"python_requires='{toml_config['project']['requires-python']}'," if toml_config["project"].get("requires-python") else ""}
+            {f"install_requires={toml_config['project']['dependencies']}," if toml_config["project"].get("dependencies") and len(toml_config["project"]["dependencies"]) > 0 else ""}
             entry_points={{
                 'console_scripts': {entry_points}
             }},
