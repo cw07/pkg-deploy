@@ -105,6 +105,8 @@ class VersionManager:
 
         for file_config in files:
             filename = file_config.get('filename')
+            if filename == "pyproject.toml":
+                continue
             search = file_config.get('search', '{current_version}')
             replace = file_config.get('replace', '{new_version}')
 
