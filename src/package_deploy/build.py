@@ -64,7 +64,7 @@ class CythonBuildStrategy(BuildStrategy):
     def build(self, config: DeployConfig, toml_config: TOMLDocument) -> bool:
         try:
             self.prepare_pyproject_for_cython_build(config.project_dir, toml_config)
-            self.create_setup_py_for_cython(toml_config, config.project_dir)
+            self.create_setup_py_for_cython(config.project_dir, toml_config)
             cmd = self.build_cmd()
             logger.info(f"Running Cython build: {' '.join(cmd)}")
             env = os.environ.copy()
@@ -78,10 +78,10 @@ class CythonBuildStrategy(BuildStrategy):
             logger.error(f"Cython build error: {e}")
             return False
         finally:
-            self.restore_pyproject_toml(project_dir=config.project_dir, original_config=toml_config)
+            self.restore_pyproject_toml(project_dir=config.project_dir, original_toml_config=toml_config)
 
     @staticmethod
-    def prepare_pyproject_for_cython_build(project_dir: Path, toml_config: Dict):
+    def prepare_pyproject_for_cython_build(project_dir: Path, toml_config: TOMLDocument):
         pyproject_path = project_dir / "pyproject.toml"
         if pyproject_path.exists():
             new_config = copy.deepcopy(toml_config)
@@ -105,14 +105,14 @@ class CythonBuildStrategy(BuildStrategy):
             save_config(new_config, pyproject_path)
 
     @staticmethod
-    def restore_pyproject_toml(project_dir: Path, original_config: Dict):
+    def restore_pyproject_toml(project_dir: Path, original_toml_config: TOMLDocument):
         pyproject_path = project_dir / "pyproject.toml"
-        if original_config:
-            save_config(original_config, pyproject_path)
+        if original_toml_config:
+            save_config(original_toml_config, pyproject_path)
             logger.info("Restored original pyproject.toml")
 
     @staticmethod  # cw07*
-    def create_setup_py_for_cython(toml_config: Dict, project_dir: Path):
+    def create_setup_py_for_cython(project_dir: Path, toml_config: TOMLDocument) :
         author_names = ", ".join([p["name"] for p in toml_config["project"]["authors"]])
         author_emails = ", ".join(p["email"] for p in toml_config["project"]["authors"])
         if "scripts" in toml_config["project"]:
