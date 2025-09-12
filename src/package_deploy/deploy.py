@@ -187,6 +187,8 @@ class PackageDeploy:
             self.cleanup_build()
             if uploaded and not self.args.no_git_push:
                 self.git_push(new_version=new_version)
+            else:
+                self.git_roll_back()
 
             logger.info('Deploy completed')
         except Exception as e:
@@ -255,6 +257,17 @@ class PackageDeploy:
         except Exception as ex:
             logger.error(f"Unexpected error: {ex}")
             logger.warning('Failed to push bump version commit. Please push manually.')
+
+    @staticmethod
+    def git_roll_back():
+        try:
+            subprocess.check_output(['git', 'restore', '.'], stderr=subprocess.STDOUT)
+            logger.info('Restored changes')
+        except subprocess.CalledProcessError as ex:
+            logger.error(f"Git command failed: {ex.output.decode()}")
+        except Exception as ex:
+            logger.error(f"Unexpected error: {ex}")
+            logger.warning('Failed to roll back changes. Please roll back manually.')
 
     @staticmethod
     def get_upload_strategy(config) -> Upload:
