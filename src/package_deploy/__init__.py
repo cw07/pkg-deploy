@@ -1,1 +1,1 @@
-from package_deploy.publish import PackageDeploy
+from package_deploy.deploy import PackageDeploy
