@@ -28,6 +28,6 @@ zip-safe = false
 where = ["src"]
 
 [[tool.bumpversion.file]]
-filename = "src/package_deploy/__init__.py"
+filename = "src/pkg_deploy/__init__.py"
 search = '__version__ = "{current_version}"'
 replace = '__version__ = "{new_version}"'
