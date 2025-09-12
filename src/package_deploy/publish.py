@@ -223,11 +223,16 @@ class PackageDeploy:
         try:
             subprocess.check_output(['git', 'add', '.'], stderr=subprocess.STDOUT)
             subprocess.check_output(['git', 'commit', '-m', f'Bump version to {new_version}'], stderr=subprocess.STDOUT)
+            tag_name = f"v{new_version}"
+            subprocess.check_output(['git', 'tag', tag_name], stderr=subprocess.STDOUT)
+            logger.info(f"Created Git tag: {tag_name}")
             subprocess.check_output(['git', 'push', '--follow-tags'], stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as ex:
+            logger.error(f"Git command failed: {ex.output.decode()}")
+            logger.warning('Failed to push bump version commit. Please push manually.')
         except Exception as ex:
-            if isinstance(ex, subprocess.CalledProcessError):
-                logger.error(ex.output)
-            logger.warning('Failed to push bump version commit. Please merge and push manually.')
+            logger.error(f"Unexpected error: {ex}")
+            logger.warning('Failed to push bump version commit. Please push manually.')
 
     @staticmethod
     def _get_deploy_strategy(config) -> Deploy:
