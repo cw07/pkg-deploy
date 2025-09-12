@@ -86,7 +86,7 @@ def parse_args(args):
 
     parser.add_argument(
         "--no-git-push",
-        action="store_false",
+        action="store_true",
         help="Push local changes to Git repository after build"
     )
 
