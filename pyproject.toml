@@ -8,8 +8,9 @@ version = "0.1.0"
 description = "Modern Python Package Deployment Tool"
 requires-python = ">=3.10"
 authors = [
-    { name = "Chen Wang", email = "wangchen9617@gmail.com"},
+    { name = "cw"},
 ]
+readme = "README.md"
 dependencies = [
     "toml",
     "tomlkit",
