@@ -60,8 +60,7 @@ class NexusUpload(Upload):
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 if result.returncode != 0:
                     raise ValueError(f"Nexus build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
-
-            logger.info("Package deployed to Nexus successfully")
+                logger.info("Package deployed to Nexus successfully")
             return True
 
         except Exception as e:
