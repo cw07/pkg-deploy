@@ -53,6 +53,11 @@ def parse_args(args):
     )
 
     parser.add_argument(
+        "--new-version",
+        help="New version number, if not specified, a new version will be resolved by version-type"
+    )
+
+    parser.add_argument(
         "--cython", "-c",
         action="store_true",
         help="Use Cython for compilation"
@@ -135,6 +140,7 @@ class PackageDeploy:
             project_dir=self.args.project_dir,
             pyproject_path=pyproject_path,
             version_type=self.args.version_type,
+            new_version=self.args.new_version,
             use_cython=self.args.cython,
             is_uv_venv=is_uv_venv(),
             repository_name=self.args.repository_name,
@@ -156,7 +162,9 @@ class PackageDeploy:
         logger.info(f"Starting deployment")
         try:
             self.check_git_status()
-            new_version = self.version_manager.bump_version(self.config.version_type)
+            new_version = self.version_manager.bump_version(version_type=self.config.version_type,
+                                                            new_version=self.config.new_version
+                                                            )
             logger.info(f"New version: {new_version}")
 
             if self.config.use_cython:

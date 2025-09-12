@@ -21,6 +21,7 @@ class DeployConfig:
     project_dir: Path
     pyproject_path: Path
     version_type: str
+    new_version: str
     use_cython: bool
     is_uv_venv: bool
     repository_name: str

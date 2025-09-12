@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Optional
 
 from package_deploy.utils import parse_prerelease, load_config, save_config
 
@@ -17,9 +18,7 @@ class VersionManager:
     def get_current_version(self) -> str:
         return self.toml_config['project']['version']
 
-    def bump_version(self, version_type: str) -> str:
-        current_version = self.get_current_version()
-
+    def resolve_new_version(self, current_version: str, version_type: str) -> str:
         version_info = parse_prerelease(current_version)
         major = version_info['major']
         minor = version_info['minor']
@@ -77,17 +76,20 @@ class VersionManager:
         else:
             raise ValueError(f"Invalid version type: {version_type}")
 
-        # Build new version string
         if prerelease_type:
             new_version = f"{major}.{minor}.{patch}{prerelease_type}{prerelease_version}"
         else:
             new_version = f"{major}.{minor}.{patch}"
+        return new_version
 
+    def bump_version(self, version_type: str, new_version: Optional[str]=None) -> str:
+        current_version = self.get_current_version()
+        if new_version is None:
+            new_version = self.resolve_new_version(current_version, version_type)
         # Update pyproject.toml
         self.toml_config['project']['version'] = new_version
         save_config(self.toml_config, self.pyproject_path)
-
-        # ALSO update files configured under [tool.bumpversion.file]
+        # Update files configured under [tool.bumpversion.file]
         self.update_bumpversion_files(current_version, new_version)
 
         logger.info(f"Version bumped from {current_version} to {new_version}")
