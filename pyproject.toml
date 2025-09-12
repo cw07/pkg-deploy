@@ -25,3 +25,8 @@ zip-safe = false
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[[tool.bumpversion.file]]
+filename = "src/package_deploy/__init__.py"
+search = '__version__ = "{current_version}"'
+replace = '__version__ = "{new_version}"'
