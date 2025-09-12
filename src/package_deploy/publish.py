@@ -30,7 +30,7 @@ def parse_args(args):
           python deploy.py --package-name my-package --version-type patch
 
           # Deploy to private Nexus, using cython
-          python deploy.py --package-name my-package --version-type minor --use-cython
+          python deploy.py --package-name my-package --version-type minor
               --repository-url https://nexus.example.com/repository/pypi-internal/
               --username admin
               --password secret
@@ -104,47 +104,54 @@ def parse_args(args):
 
 class PackageDeploy:
     def __init__(self, args):
-        args = parse_args(args)
-        if not (args.project_dir / "pyproject.toml").exists():
+        self.args = parse_args(args)
+        if not (self.args.project_dir / "pyproject.toml").exists():
             raise ValueError("pyproject.toml not found")
 
-        if args.verbose:
+        if self.args.verbose:
             logging.getLogger().setLevel(logging.DEBUG)
 
-        self.check_require_package(args.cython)
+        self.check_require_package(self.args.cython)
 
         pypirc_info = get_pypirc_info()
         repos = pypirc_info["repositories"]
-        if args.repository_name and args.repository_name in repos:
-            repository_info = repos[args.repository_name]
+        if self.args.repository_name and self.args.repository_name in repos:
+            repository_info = repos[self.args.repository_name]
             url = repository_info["repository"]
             username = repository_info["username"]
             password = repository_info["password"]
-        elif args.repository_name:
+        elif self.args.repository_name:
             raise ValueError("Repository name is provided but not found in .pypirc")
         else:
-            url = args.repository_url
-            username, password = get_credentials(args)
+            url = self.args.repository_url
+            username, password = get_credentials(self.args)
 
-        pyproject_path = args.project_dir / "pyproject.toml"
+        pyproject_path = self.args.project_dir / "pyproject.toml"
 
         self.version_manager = VersionManager(pyproject_path)
         self.config = DeployConfig(
             package_name=self.version_manager.toml_config["project"]["name"],
-            project_dir=args.project_dir,
+            project_dir=self.args.project_dir,
             pyproject_path=pyproject_path,
-            version_type=args.version_type,
-            use_cython=args.cython,
+            version_type=self.args.version_type,
+            use_cython=self.args.cython,
             is_uv_venv=is_uv_venv(),
-            repository_name=args.repository_name,
+            repository_name=self.args.repository_name,
             repository_url=url,
             username=username,
             password=password,
-            dry_run=args.dry_run
+            dry_run=self.args.dry_run
         )
         self.setup_file_exist = (self.config.project_dir / "setup.py").exists()
 
     def deploy(self):
+        logger.info("=== Deployment Configuration ===")
+        for arg_name, arg_value in vars(self.args).items():
+            display_value = arg_value
+            if arg_name in ('username', 'password') and arg_value is not None:
+                display_value = '***MASKED***'
+            logger.info(f"{arg_name}: {display_value}")
+        logger.info("=================================")
         logger.info(f"Starting deployment")
         try:
             self.check_git_status()
