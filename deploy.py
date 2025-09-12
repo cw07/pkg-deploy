@@ -1,3 +1,3 @@
-from package_deploy import PackageDeploy
+from src.package_deploy import PackageDeploy
 
 PackageDeploy().deploy()
