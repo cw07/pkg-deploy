@@ -53,7 +53,13 @@ class StandardBuildStrategy(BuildStrategy):
     def build(self, config: DeployConfig, toml_config: TOMLDocument) -> bool:
         cmd = self.build_cmd()
         logger.info(f"Running: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True, cwd=config.project_dir)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            cwd=config.project_dir
+        )
         if result.returncode != 0:
            raise ValueError(f"Build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
         logger.info("Standard build completed successfully")
@@ -69,7 +75,16 @@ class CythonBuildStrategy(BuildStrategy):
             logger.info(f"Running Cython build: {' '.join(cmd)}")
             env = os.environ.copy()
             env['CYTHONIZE'] = '1'
-            result = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=config.project_dir)
+            env['PYTHONIOENCODING'] = 'utf-8'
+            env['PYTHONUTF8'] = '1'
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                env=env,
+                cwd=config.project_dir
+            )
             if result.returncode != 0:
                 raise ValueError(f"Cython build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
             logger.info("Cython build completed successfully")
@@ -176,5 +191,5 @@ class CythonBuildStrategy(BuildStrategy):
         )
         ''').strip()
 
-        with open(project_dir / "setup.py", 'w') as f:
+        with open(project_dir / "setup.py", 'w', encoding='utf-8') as f:
             f.write(setup_py_content)
