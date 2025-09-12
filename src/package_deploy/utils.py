@@ -1,7 +1,6 @@
 import os
 import re
 import sys
-import toml
 import shutil
 import tomlkit
 import logging
@@ -42,43 +41,6 @@ def setup_uv_compatibility():
         return True
     else:
         return False
-
-
-def create_sample_pyproject_toml():
-    """创建示例 pyproject.toml 文件"""
-    sample_config = {
-        "build-system": {
-            "requires": ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"],
-            "build-backend": "setuptools.build_meta"
-        },
-        "project": {
-            "name": "my-awesome-package",
-            "version": "0.1.0",
-            "description": "An awesome Python package",
-            "authors": [{"name": "Your Name", "email": "your.email@example.com"}],
-            "dependencies": [],
-            "requires-python": ">=3.8",
-            "classifiers": [
-                "Development Status :: 3 - Alpha",
-                "Intended Audience :: Developers",
-                "License :: OSI Approved :: MIT License",
-                "Programming Language :: Python :: 3.8",
-                "Programming Language :: Python :: 3.9",
-                "Programming Language :: Python :: 3.10",
-                "Programming Language :: Python :: 3.11",
-            ]
-        },
-        "tool": {
-            "setuptools": {
-                "package-dir": {"": "src"},
-                "packages": {"find": {"where": ["src"]}}
-            }
-        }
-    }
-
-    with open("pyproject.toml", "w", encoding="utf-8") as f:
-        toml.dump(sample_config, f)
-    logger.info("Created sample pyproject.toml")
 
 
 def get_credentials(args) -> tuple[Optional[str], Optional[str]]:
