@@ -1,3 +1,4 @@
+import re
 import logging
 from pathlib import Path
 
@@ -31,7 +32,6 @@ class VersionManager:
         # Handle version bumping
         if version_type == 'patch':
             if has_prerelease:
-                # Remove prerelease, keep same patch number
                 prerelease_type = None
                 prerelease_version = 1
             else:
@@ -52,39 +52,32 @@ class VersionManager:
                 if prerelease_type == 'a':
                     prerelease_version += 1
                 else:
-                    # Switch to alpha, increment prerelease version
                     prerelease_type = 'a'
                     prerelease_version = 1
             else:
-                # Add alpha to current version
                 prerelease_type = 'a'
                 prerelease_version = 1
         elif version_type == 'beta':
             if has_prerelease:
                 if prerelease_type == 'a':
-                    # alpha → beta
                     prerelease_type = 'b'
                     prerelease_version = 1
                 elif prerelease_type == 'b':
                     prerelease_version += 1
                 else:
-                    # rc → beta (unusual, but handle it)
                     prerelease_type = 'b'
                     prerelease_version = 1
             else:
-                # Add beta to current version
                 prerelease_type = 'b'
                 prerelease_version = 1
         elif version_type == 'rc':
             if has_prerelease:
                 if prerelease_type in ['a', 'b']:
-                    # alpha/beta → rc
                     prerelease_type = 'rc'
                     prerelease_version = 1
                 elif prerelease_type == 'rc':
                     prerelease_version += 1
             else:
-                # Add rc to current version
                 prerelease_type = 'rc'
                 prerelease_version = 1
         else:
@@ -96,8 +89,56 @@ class VersionManager:
         else:
             new_version = f"{major}.{minor}.{patch}"
 
+        # Update pyproject.toml
         self.toml_config['project']['version'] = new_version
         save_config(self.toml_config, self.pyproject_path)
 
+        # ALSO update files configured under [tool.bumpversion.file]
+        self._update_bumpversion_files(current_version, new_version)
+
         logger.info(f"Version bumped from {current_version} to {new_version}")
         return new_version
+
+    def _update_bumpversion_files(self, current_version: str, new_version: str):
+        """Update files configured in [tool.bumpversion.file] section."""
+        bumpversion_config = self.toml_config.get('tool', {}).get('bumpversion', {})
+        files = bumpversion_config.get('file', [])
+
+        # If 'file' is a single dict, make it a list
+        if isinstance(files, dict):
+            files = [files]
+
+        for file_config in files:
+            filename = file_config.get('filename')
+            search = file_config.get('search', '{current_version}')
+            replace = file_config.get('replace', '{new_version}')
+
+            if not filename:
+                logger.warning("Skipping bumpversion file entry with no 'filename'")
+                continue
+
+            file_path = Path(filename)
+            if not file_path.exists():
+                logger.warning(f"File {filename} not found, skipping.")
+                continue
+
+            # Read file content
+            content = file_path.read_text(encoding='utf-8')
+
+            # Replace placeholders
+            old_str = search.format(current_version=current_version)
+            new_str = replace.format(new_version=new_version)
+
+            # Escape for literal string replacement (not regex)
+            if old_str not in content:
+                logger.warning(f"Search pattern '{old_str}' not found in {filename}, skipping.")
+                continue
+
+            new_content = content.replace(old_str, new_str)
+
+            # Write back only if changed
+            if new_content != content:
+                file_path.write_text(new_content, encoding='utf-8')
+                logger.info(f"Updated {filename}: '{old_str}' → '{new_str}'")
+            else:
+                logger.debug(f"No changes needed in {filename}")
