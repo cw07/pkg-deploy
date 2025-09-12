@@ -166,12 +166,25 @@ class PackageDeploy:
                 display_value = '***MASKED***'
             logger.info(f"{arg_name}: {display_value}")
         logger.info("=================================")
-        logger.info(f"Starting deployment")
+        
+        if self.config.dry_run:
+            logger.info("DRY RUN: Starting deployment simulation")
+        else:
+            logger.info(f"Starting deployment")
+            
         try:
             self.check_git_status()
-            new_version = self.version_manager.bump_version(version_type=self.config.version_type,
-                                                            new_version=self.config.new_version)
-            logger.info(f"New version: {new_version}")
+
+            new_version = self.version_manager.bump_version(
+                version_type=self.config.version_type,
+                new_version=self.config.new_version,
+                dry_run=self.config.dry_run
+            )
+            
+            if self.config.dry_run:
+                logger.info(f"DRY RUN: Would bump version to: {new_version}")
+            else:
+                logger.info(f"New version: {new_version}")
 
             if self.config.use_cython:
                 build_strategy = CythonBuildStrategy()
@@ -184,11 +197,13 @@ class PackageDeploy:
                 dist_dir = self.config.project_dir / "dist"
                 uploaded = upload_strategy.upload(self.config, dist_dir)
 
-            self.cleanup_build()
+            if not self.config.dry_run:
+                self.cleanup_build_files()
+
             if uploaded and not self.args.no_git_push:
-                self.git_push(new_version=new_version)
+                self.git_push(new_version=new_version, dry_run=self.config.dry_run)
             else:
-                self.git_roll_back()
+                self.git_roll_back(dry_run=self.config.dry_run)
 
             logger.info('Deploy completed')
         except Exception as e:
@@ -213,7 +228,7 @@ class PackageDeploy:
             logger.error(f"Install them with: pip install {' '.join(missing_packages)}")
             raise ValueError("Missing required packages")
 
-    def cleanup_build(self):
+    def cleanup_build_files(self):
         logger.info('Deleting build, dist and egg-info files after deployment')
         shutil.rmtree('dist', ignore_errors=True)
         shutil.rmtree('build', ignore_errors=True)
@@ -242,15 +257,23 @@ class PackageDeploy:
             raise IOError(f"Git repo is NOT clean: \n{result.stdout}")
 
     @staticmethod
-    def git_push(new_version: str):
+    def git_push(new_version: str, dry_run: bool = False):
         try:
-            subprocess.check_output(['git', 'add', '.'], stderr=subprocess.STDOUT)
-            subprocess.check_output(['git', 'commit', '-m', f'Bump version to {new_version}'], stderr=subprocess.STDOUT)
-            tag_name = f"v{new_version}"
-            subprocess.check_output(['git', 'tag', '-a', tag_name, '-m', f'Release {tag_name}'], stderr=subprocess.STDOUT)
-            logger.info(f"Created Git tag: {tag_name}")
-            subprocess.check_output(['git', 'push', '--follow-tags'], stderr=subprocess.STDOUT)
-            logger.info('Pushing to github')
+            if dry_run:
+                logger.info("DRY RUN: Would run: git add .")
+                logger.info(f"DRY RUN: Would run: git commit -m 'Bump version to {new_version}'")
+                tag_name = f"v{new_version}"
+                logger.info(f"DRY RUN: Would create Git tag: {tag_name}")
+                logger.info("DRY RUN: Would run: git push --follow-tags")
+                logger.info('DRY RUN: Git push simulation completed')
+            else:
+                subprocess.check_output(['git', 'add', '.'], stderr=subprocess.STDOUT)
+                subprocess.check_output(['git', 'commit', '-m', f'Bump version to {new_version}'], stderr=subprocess.STDOUT)
+                tag_name = f"v{new_version}"
+                subprocess.check_output(['git', 'tag', '-a', tag_name, '-m', f'Release {tag_name}'], stderr=subprocess.STDOUT)
+                logger.info(f"Created Git tag: {tag_name}")
+                subprocess.check_output(['git', 'push', '--follow-tags'], stderr=subprocess.STDOUT)
+                logger.info('Pushing to github')
         except subprocess.CalledProcessError as ex:
             logger.error(f"Git command failed: {ex.output.decode()}")
             logger.warning('Failed to push bump version commit. Please push manually.')
@@ -259,10 +282,14 @@ class PackageDeploy:
             logger.warning('Failed to push bump version commit. Please push manually.')
 
     @staticmethod
-    def git_roll_back():
+    def git_roll_back(dry_run: bool = False):
         try:
-            subprocess.check_output(['git', 'restore', '.'], stderr=subprocess.STDOUT)
-            logger.info('Restored changes')
+            if dry_run:
+                logger.info("DRY RUN: Would run: git restore .")
+                logger.info('DRY RUN: Git rollback simulation completed')
+            else:
+                subprocess.check_output(['git', 'restore', '.'], stderr=subprocess.STDOUT)
+                logger.info('Restored changes')
         except subprocess.CalledProcessError as ex:
             logger.error(f"Git command failed: {ex.output.decode()}")
         except Exception as ex:

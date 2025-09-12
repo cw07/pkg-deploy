@@ -39,22 +39,27 @@ class NexusUpload(Upload):
             if not config.repository_url:
                 raise ValueError("Repository URL is required for Nexus deployment")
 
+            if config.dry_run:
+                logger.info("DRY RUN: Would get wheel files from dist directory")
+                logger.info(f"DRY RUN: Would upload to repository: {config.repository_url}")
+                if config.username:
+                    logger.info(f"DRY RUN: Would use username: {config.username}")
+                if config.password:
+                    logger.info("DRY RUN: Would use provided password")
+                logger.info("DRY RUN: Package upload simulation completed successfully")
+                return True
+
             wheel_file = self.get_wheel_files(config)
 
-            if config.dry_run:
-                cmd = [sys.executable, "-m", "twine", "check",
-                       f"dist/{wheel_file}"
-                       ]
-            else:
-                cmd = [sys.executable, "-m", "twine", "upload",
-                       "--repository-url", config.repository_url,
-                       f"dist/{wheel_file}",
-                       "--disable-progress-bar"
-                       ]
-                if config.username:
-                    cmd.extend(["--username", config.username])
-                if config.password:
-                    cmd.extend(["--password", config.password])
+            cmd = [sys.executable, "-m", "twine", "upload",
+                   "--repository-url", config.repository_url,
+                   f"dist/{wheel_file}",
+                   "--disable-progress-bar"
+                   ]
+            if config.username:
+                cmd.extend(["--username", config.username])
+            if config.password:
+                cmd.extend(["--password", config.password])
 
             logger.info(f"Running: {' '.join(cmd)}")
             result = subprocess.run(cmd, capture_output=True, text=True)
@@ -66,5 +71,8 @@ class NexusUpload(Upload):
             return True
 
         except Exception as e:
-            logger.error(f"Nexus deploy error: {e}")
+            if config.dry_run:
+                logger.error(f"DRY RUN: Nexus deploy simulation error: {e}")
+            else:
+                logger.error(f"Nexus deploy error: {e}")
             return False

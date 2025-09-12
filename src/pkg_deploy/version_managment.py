@@ -83,15 +83,17 @@ class VersionManager:
             new_version = f"{major}.{minor}.{patch}"
         return new_version
 
-    def bump_version(self, version_type: str, new_version: Optional[str]=None) -> str:
+    def bump_version(self, version_type: str, new_version: Optional[str]=None, dry_run: bool = False) -> str:
         current_version = self.get_current_version()
         if new_version is None:
             new_version = self.resolve_new_version(current_version, version_type)
-        # Update pyproject.toml
-        self.toml_config['project']['version'] = new_version
-        save_config(self.toml_config, self.pyproject_path)
-        # Update files configured under [tool.bumpversion.file]
-        self.update_bumpversion_files(current_version, new_version)
+        
+        if not dry_run:
+            # Update pyproject.toml
+            self.toml_config['project']['version'] = new_version
+            save_config(self.toml_config, self.pyproject_path)
+            # Update files configured under [tool.bumpversion.file]
+            self.update_bumpversion_files(current_version, new_version)
 
         logger.info(f"Version bumped from {current_version} to {new_version}")
         return new_version
