@@ -221,7 +221,7 @@ class PackageDeploy:
     def git_push(new_version: str):
         logger.info('Pushing to github')
         try:
-            subprocess.check_output(['git', 'add.'], stderr=subprocess.STDOUT)
+            subprocess.check_output(['git', 'add', '.'], stderr=subprocess.STDOUT)
             subprocess.check_output(['git', 'commit', '-m', f'Bump version to {new_version}'], stderr=subprocess.STDOUT)
             subprocess.check_output(['git', 'push', '--follow-tags'], stderr=subprocess.STDOUT)
         except Exception as ex:
