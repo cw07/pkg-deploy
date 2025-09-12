@@ -10,7 +10,7 @@ import argparse
 import subprocess
 import configparser
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Optional
 from tomlkit.toml_document import TOMLDocument
 
 

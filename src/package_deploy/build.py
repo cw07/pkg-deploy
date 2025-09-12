@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional, Dict
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
+from tomlkit.toml_document import TOMLDocument
 
 from package_deploy.utils import save_config, is_uv_venv, ensure_uv_installed
 
@@ -43,13 +44,13 @@ class BuildStrategy(ABC):
         return cmd
 
     @abstractmethod
-    def build(self, config: DeployConfig, toml_config: Optional[Dict]=None) -> bool:
+    def build(self, config: DeployConfig, toml_config: TOMLDocument) -> bool:
         pass
 
 
 class StandardBuildStrategy(BuildStrategy):
 
-    def build(self, config: DeployConfig, toml_config: Optional[Dict]=None) -> bool:
+    def build(self, config: DeployConfig, toml_config: TOMLDocument) -> bool:
         cmd = self.build_cmd()
         logger.info(f"Running: {' '.join(cmd)}")
         result = subprocess.run(cmd, capture_output=True, text=True, cwd=config.project_dir)
@@ -60,7 +61,7 @@ class StandardBuildStrategy(BuildStrategy):
 
 class CythonBuildStrategy(BuildStrategy):
 
-    def build(self, config: DeployConfig, toml_config: Optional[Dict]=None) -> bool:
+    def build(self, config: DeployConfig, toml_config: TOMLDocument) -> bool:
         try:
             self.prepare_pyproject_for_cython_build(config.project_dir, toml_config)
             self.create_setup_py_for_cython(toml_config, config.project_dir)
