@@ -9,8 +9,8 @@ from pathlib import Path
 
 from package_deploy.upload import Upload, NexusUpload
 from package_deploy.version_managment import VersionManager
-from package_deploy.utils import get_pypirc_info, get_credentials, is_uv_venv
 from package_deploy.build import DeployConfig, CythonBuildStrategy, StandardBuildStrategy
+from package_deploy.utils import get_pypirc_info, get_credentials, is_uv_venv, validate_version_arg
 
 
 logging.basicConfig(
@@ -54,6 +54,7 @@ def parse_args(args):
 
     parser.add_argument(
         "--new-version",
+        type=validate_version_arg,
         help="New version number, if not specified, a new version will be resolved by version-type"
     )
 
@@ -163,8 +164,7 @@ class PackageDeploy:
         try:
             self.check_git_status()
             new_version = self.version_manager.bump_version(version_type=self.config.version_type,
-                                                            new_version=self.config.new_version
-                                                            )
+                                                            new_version=self.config.new_version)
             logger.info(f"New version: {new_version}")
 
             if self.config.use_cython:

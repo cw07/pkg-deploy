@@ -6,6 +6,7 @@ import shutil
 import tomlkit
 import logging
 import getpass
+import argparse
 import subprocess
 import configparser
 from pathlib import Path
@@ -254,3 +255,21 @@ def load_config(pyproject_path: Path) -> Dict[str, Any]:
 def save_config(config, pyproject_path: Path):
     with open(pyproject_path, 'w', encoding='utf-8') as f:
         f.write(tomlkit.dumps(config))
+
+
+def validate_version_arg(value: str) -> str:
+    """
+    Custom argparse validator that checks if a version string conforms to SemVer.
+    Returns the value if valid, raises an error otherwise.
+    """
+    version_pattern = re.compile(r"^\d+\.\d+\.\d+(a\d+|b\d+|rc\d+)?$")
+
+    if not version_pattern.match(value):
+        raise argparse.ArgumentTypeError(
+            f"Invalid version format: '{value}'. Valid examples:\n"
+            "  Final release: 1.2.0\n"
+            "  Alpha release: 1.2.0a1\n"
+            "  Beta release: 1.2.0b1\n"
+            "  Release candidate: 1.2.0rc1"
+        )
+    return value
