@@ -89,12 +89,12 @@ class VersionManager:
         save_config(self.toml_config, self.pyproject_path)
 
         # ALSO update files configured under [tool.bumpversion.file]
-        self._update_bumpversion_files(current_version, new_version)
+        self.update_bumpversion_files(current_version, new_version)
 
         logger.info(f"Version bumped from {current_version} to {new_version}")
         return new_version
 
-    def _update_bumpversion_files(self, current_version: str, new_version: str):
+    def update_bumpversion_files(self, current_version: str, new_version: str):
         """Update files configured in [tool.bumpversion.file] section."""
         bumpversion_config = self.toml_config.get('tool', {}).get('bumpversion', {})
         files = bumpversion_config.get('file', [])
