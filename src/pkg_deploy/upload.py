@@ -59,13 +59,9 @@ class NexusUpload(Upload):
             else:
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 if result.returncode != 0:
-                    raise ValueError(f"Nexus build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
-                logger.info("Package deployed to Nexus successfully")
+                    raise ValueError(f"Upload failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
+                logger.info(f"Package uploaded to {config.repository_url} successfully")
             return True
-
         except Exception as e:
-            if config.dry_run:
-                logger.error(f"DRY RUN: Nexus deploy simulation error: {e}")
-            else:
-                logger.error(f"Nexus deploy error: {e}")
+            logger.error(f"Package upload error: {e}")
             return False
