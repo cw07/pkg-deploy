@@ -31,22 +31,17 @@ class VersionManager:
 
         # Handle version bumping
         if version_type == 'patch':
-            if has_prerelease:
-                prerelease_type = None
-                prerelease_version = 1
-            else:
-                patch += 1
+            prerelease_type = None
+            patch += 1
         elif version_type == 'minor':
             minor += 1
             patch = 0
             prerelease_type = None
-            prerelease_version = 1
         elif version_type == 'major':
             major += 1
             minor = 0
             patch = 0
             prerelease_type = None
-            prerelease_version = 1
         elif version_type == 'alpha':
             if has_prerelease:
                 if prerelease_type == 'a':
