@@ -47,13 +47,13 @@ def parse_args(args):
     )
 
     parser.add_argument(
-        "--version-type", "-v",
+        "--version-type", "-vt",
         default="patch",
         help="Version bump type (default: patch)"
     )
 
     parser.add_argument(
-        "--new-version",
+        "--new-version", "-v",
         type=validate_version_arg,
         help="New version number, if not specified, a new version will be resolved by version-type"
     )
