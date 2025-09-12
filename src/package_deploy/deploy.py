@@ -7,10 +7,10 @@ import argparse
 import subprocess
 from pathlib import Path
 
-from package_deploy.upload import Upload, NexusUpload
-from package_deploy.version_managment import VersionManager
-from package_deploy.build import DeployConfig, CythonBuildStrategy, StandardBuildStrategy
-from package_deploy.utils import get_pypirc_info, get_credentials, is_uv_venv, validate_version_arg
+from src.package_deploy.upload import Upload, NexusUpload
+from src.package_deploy.version_managment import VersionManager
+from src.package_deploy.build import DeployConfig, CythonBuildStrategy, StandardBuildStrategy
+from src.package_deploy.utils import get_pypirc_info, get_credentials, is_uv_venv, validate_version_arg
 
 
 logging.basicConfig(
