@@ -9,7 +9,7 @@ from typing import Optional, Dict
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
-from package_deploy.utils import save_config, is_uv_venv, ensure_uv_installed, load_config
+from package_deploy.utils import save_config, is_uv_venv, ensure_uv_installed
 
 
 logger = logging.getLogger(__name__)
