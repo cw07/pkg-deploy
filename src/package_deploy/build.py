@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from tomlkit.toml_document import TOMLDocument
 
-from src.package_deploy.utils import save_config, is_uv_venv, ensure_uv_installed
+from ..package_deploy.utils import save_config, is_uv_venv, ensure_uv_installed
 
 
 logger = logging.getLogger(__name__)
