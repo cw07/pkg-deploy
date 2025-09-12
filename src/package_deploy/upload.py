@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-Modern Python Package Deployment Tool
-"""
 import sys
 import logging
 import subprocess
@@ -14,15 +11,15 @@ from package_deploy.build import DeployConfig
 logger = logging.getLogger(__name__)
 
 
-class Deploy(ABC):
+class Upload(ABC):
     """Deploy Base class"""
 
     @abstractmethod
-    def deploy(self, config: DeployConfig, dist_dir: Path) -> bool:
+    def upload(self, config: DeployConfig, dist_dir: Path) -> bool:
         pass
 
 
-class NexusDeploy(Deploy):
+class NexusUpload(Upload):
     """Nexus Deploy"""
 
     @staticmethod
@@ -37,7 +34,7 @@ class NexusDeploy(Deploy):
         logger.info(f"Built {wheel_file}")
         return wheel_file
 
-    def deploy(self, config: DeployConfig, dist_dir: Path) -> bool:
+    def upload(self, config: DeployConfig, dist_dir: Path) -> bool:
         try:
             if not config.repository_url:
                 raise ValueError("Repository URL is required for Nexus deployment")

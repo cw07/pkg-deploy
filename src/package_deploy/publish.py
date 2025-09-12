@@ -7,7 +7,7 @@ import argparse
 import subprocess
 from pathlib import Path
 
-from package_deploy.deploy import Deploy, NexusDeploy
+from package_deploy.upload import Upload, NexusUpload
 from package_deploy.version_managment import VersionManager
 from package_deploy.utils import get_pypirc_info, get_credentials, is_uv_venv
 from package_deploy.build import DeployConfig, CythonBuildStrategy, StandardBuildStrategy
@@ -163,17 +163,17 @@ class PackageDeploy:
             else:
                 build_strategy = StandardBuildStrategy()
 
-            deployed = False
+            uploaded = False
             if build_strategy.build(self.config, self.version_manager.toml_config):
-                deploy_strategy = self._get_deploy_strategy(self.config)
+                upload_strategy = self.get_upload_strategy(self.config)
                 dist_dir = self.config.project_dir / "dist"
-                deployed = deploy_strategy.deploy(self.config, dist_dir)
+                uploaded = upload_strategy.upload(self.config, dist_dir)
 
             self.cleanup_build()
-            if deployed:
+            if uploaded:
                 self.git_push(new_version=new_version)
 
-            logger.info('Deploy Complete')
+            logger.info('Deploy completed')
         except Exception as e:
             logger.error(f"Deployment failed: {e}")
             return False
@@ -242,7 +242,7 @@ class PackageDeploy:
             logger.warning('Failed to push bump version commit. Please push manually.')
 
     @staticmethod
-    def _get_deploy_strategy(config) -> Deploy:
-        return NexusDeploy()
+    def get_upload_strategy(config) -> Upload:
+        return NexusUpload()
 
 
