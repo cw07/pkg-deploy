@@ -103,7 +103,8 @@ def parse_args(args):
 
 
 class PackageDeploy:
-    def __init__(self, args):
+    def __init__(self):
+        args = sys.argv[1:]
         self.args = parse_args(args)
         if not (self.args.project_dir / "pyproject.toml").exists():
             raise ValueError("pyproject.toml not found")
