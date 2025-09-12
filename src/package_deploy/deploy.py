@@ -85,6 +85,12 @@ def parse_args(args):
     )
 
     parser.add_argument(
+        "--no-git-push",
+        action="store_false",
+        help="Push local changes to Git repository after build"
+    )
+
+    parser.add_argument(
         "--interactive", "-i",
         action="store_true",
         help="Force interactive credential input (useful for Nexus)"
@@ -179,7 +185,7 @@ class PackageDeploy:
                 uploaded = upload_strategy.upload(self.config, dist_dir)
 
             self.cleanup_build()
-            if uploaded:
+            if uploaded and not self.args.no_git_push:
                 self.git_push(new_version=new_version)
 
             logger.info('Deploy completed')
