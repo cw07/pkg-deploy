@@ -48,7 +48,6 @@ def parse_args(args):
 
     parser.add_argument(
         "--version-type", "-v",
-        choices=["patch", "minor", "major", "prerelease"],
         default="patch",
         help="Version bump type (default: patch)"
     )
