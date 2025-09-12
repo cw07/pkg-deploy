@@ -111,10 +111,14 @@ class CythonBuildStrategy(BuildStrategy):
             save_config(original_toml_config, pyproject_path)
             logger.info("Restored original pyproject.toml")
 
-    @staticmethod  # cw07*
-    def create_setup_py_for_cython(project_dir: Path, toml_config: TOMLDocument) :
-        author_names = ", ".join([p["name"] for p in toml_config["project"]["authors"]])
-        author_emails = ", ".join(p["email"] for p in toml_config["project"]["authors"])
+    @staticmethod
+    def create_setup_py_for_cython(project_dir: Path, toml_config: TOMLDocument):
+        if "authors" in toml_config["project"]:
+            author_names = ", ".join(p["name"] for p in toml_config["project"]["authors"] if "name" in p)
+            author_emails = ", ".join(p["email"] for p in toml_config["project"]["authors"] if "email" in p)
+        else:
+            author_names = ""
+            author_emails = ""
         if "scripts" in toml_config["project"]:
             entry_points = [f"{k}={v}" for k, v in toml_config["project"]["scripts"].items()]
         else:
@@ -149,11 +153,11 @@ class CythonBuildStrategy(BuildStrategy):
         setup(
             name="{toml_config["project"]["name"]}",
             version="{toml_config["project"]["version"]}",
-            author="{author_names}",
-            author_email="{author_emails}",
-            description="{toml_config["project"]["description"]}",
-            python_requires="{toml_config["project"]["requires-python"]}",
-            install_requires={toml_config["project"]["dependencies"]},
+            {f"author='{author_names}'," if author_names else ""}
+            {f"author_email='{author_emails}'," if author_emails else ""}
+            {f"description='{toml_config["project"]["description"]}'," if toml_config["project"].get("description", "") else ""}
+            {f"python_requires='{toml_config["project"]["requires-python"]}'," if toml_config["project"].get("requires-python") else ""}
+            {f"install_requires={toml_config["project"]["dependencies"]}," if toml_config["project"].get("dependencies") and len(toml_config["project"]["dependencies"]) > 0 else ""}
             entry_points={{
                 'console_scripts': {entry_points}
             }},
