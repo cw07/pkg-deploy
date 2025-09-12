@@ -11,6 +11,7 @@ import subprocess
 import configparser
 from pathlib import Path
 from typing import Dict, Any, Optional
+from tomlkit.toml_document import TOMLDocument
 
 
 logger = logging.getLogger(__name__)
@@ -241,7 +242,7 @@ def ensure_uv_installed():
         raise RuntimeError("uv installed but failed to run.") from e
 
 
-def load_config(pyproject_path: Path) -> Dict[str, Any]:
+def load_config(pyproject_path: Path) -> TOMLDocument:
     """load pyproject.toml"""
     if not pyproject_path.exists():
         raise FileNotFoundError(f"pyproject.toml not found at {pyproject_path}")
