@@ -1,3 +1,3 @@
-__version__ = "0.1.6"
+__version__ = "0.1.0"
 
 from ..package_deploy.deploy import PackageDeploy
