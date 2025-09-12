@@ -116,11 +116,10 @@ class CythonBuildStrategy(BuildStrategy):
         author_names = ", ".join([p["name"] for p in toml_config["project"]["authors"]])
         author_emails = ", ".join(p["email"] for p in toml_config["project"]["authors"])
         if "scripts" in toml_config["project"]:
-            entry_points = ", ".join(f"{k}={v}" for k, v in toml_config["project"]["scripts"].items())
+            entry_points = [f"{k}={v}" for k, v in toml_config["project"]["scripts"].items()]
         else:
-            entry_points = ""
+            entry_points = []
         setup_py_content = textwrap.dedent(f'''
-        import os
         import glob
         from Cython.Build import cythonize
         from setuptools import setup, find_packages
@@ -156,7 +155,7 @@ class CythonBuildStrategy(BuildStrategy):
             python_requires="{toml_config["project"]["requires-python"]}",
             install_requires={toml_config["project"]["dependencies"]},
             entry_points={{
-                'console_scripts': [{entry_points}]
+                'console_scripts': {entry_points}
             }},
             packages=find_packages(where="src"),
             package_dir={{"": "src"}},
