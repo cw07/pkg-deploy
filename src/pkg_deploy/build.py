@@ -52,42 +52,28 @@ class StandardBuildStrategy(BuildStrategy):
 
     def build(self, config: DeployConfig, toml_config: TOMLDocument) -> bool:
         cmd = self.build_cmd()
-        
-        if config.dry_run:
-            logger.info(f"DRY RUN: Would run: {' '.join(cmd)}")
-            logger.info("DRY RUN: Standard build simulation completed successfully")
-            return True
-        else:
-            logger.info(f"Running: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=config.project_dir)
-            if result.returncode != 0:
-               raise ValueError(f"Build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
-            logger.info("Standard build completed successfully")
-            return True
+        logger.info(f"Running: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=config.project_dir)
+        if result.returncode != 0:
+           raise ValueError(f"Build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
+        logger.info("Standard build completed successfully")
+        return True
 
 class CythonBuildStrategy(BuildStrategy):
 
     def build(self, config: DeployConfig, toml_config: TOMLDocument) -> bool:
         try:
-            if config.dry_run:
-                logger.info("DRY RUN: Would prepare pyproject.toml for Cython build")
-                logger.info("DRY RUN: Would create setup.py for Cython")
-                cmd = self.build_cmd()
-                logger.info(f"DRY RUN: Would run Cython build: {' '.join(cmd)}")
-                logger.info("DRY RUN: Cython build simulation completed successfully")
-                return True
-            else:
-                self.prepare_pyproject_for_cython_build(config.project_dir, toml_config)
-                self.create_setup_py_for_cython(config.project_dir, toml_config)
-                cmd = self.build_cmd()
-                logger.info(f"Running Cython build: {' '.join(cmd)}")
-                env = os.environ.copy()
-                env['CYTHONIZE'] = '1'
-                result = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=config.project_dir)
-                if result.returncode != 0:
-                    raise ValueError(f"Cython build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
-                logger.info("Cython build completed successfully")
-                return True
+            self.prepare_pyproject_for_cython_build(config.project_dir, toml_config)
+            self.create_setup_py_for_cython(config.project_dir, toml_config)
+            cmd = self.build_cmd()
+            logger.info(f"Running Cython build: {' '.join(cmd)}")
+            env = os.environ.copy()
+            env['CYTHONIZE'] = '1'
+            result = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=config.project_dir)
+            if result.returncode != 0:
+                raise ValueError(f"Cython build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
+            logger.info("Cython build completed successfully")
+            return True
         except Exception as e:
             logger.error(f"Cython build error: {e}")
             return False

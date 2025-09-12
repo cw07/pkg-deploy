@@ -197,13 +197,12 @@ class PackageDeploy:
                 dist_dir = self.config.project_dir / "dist"
                 uploaded = upload_strategy.upload(self.config, dist_dir)
 
-            if not self.config.dry_run:
-                self.cleanup_build_files()
+            self.cleanup_build_files()
 
             if uploaded and not self.args.no_git_push:
                 self.git_push(new_version=new_version, dry_run=self.config.dry_run)
             else:
-                self.git_roll_back(dry_run=self.config.dry_run)
+                self.git_roll_back()
 
             logger.info('Deploy completed')
         except Exception as e:
@@ -282,14 +281,10 @@ class PackageDeploy:
             logger.warning('Failed to push bump version commit. Please push manually.')
 
     @staticmethod
-    def git_roll_back(dry_run: bool = False):
+    def git_roll_back():
         try:
-            if dry_run:
-                logger.info("DRY RUN: Would run: git restore .")
-                logger.info('DRY RUN: Git rollback simulation completed')
-            else:
-                subprocess.check_output(['git', 'restore', '.'], stderr=subprocess.STDOUT)
-                logger.info('Restored changes')
+            subprocess.check_output(['git', 'restore', '.'], stderr=subprocess.STDOUT)
+            logger.info('Restored changes')
         except subprocess.CalledProcessError as ex:
             logger.error(f"Git command failed: {ex.output.decode()}")
         except Exception as ex:

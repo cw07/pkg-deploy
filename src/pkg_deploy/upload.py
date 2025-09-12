@@ -39,16 +39,6 @@ class NexusUpload(Upload):
             if not config.repository_url:
                 raise ValueError("Repository URL is required for Nexus deployment")
 
-            if config.dry_run:
-                logger.info("DRY RUN: Would get wheel files from dist directory")
-                logger.info(f"DRY RUN: Would upload to repository: {config.repository_url}")
-                if config.username:
-                    logger.info(f"DRY RUN: Would use username: {config.username}")
-                if config.password:
-                    logger.info("DRY RUN: Would use provided password")
-                logger.info("DRY RUN: Package upload simulation completed successfully")
-                return True
-
             wheel_file = self.get_wheel_files(config)
 
             cmd = [sys.executable, "-m", "twine", "upload",
@@ -62,10 +52,14 @@ class NexusUpload(Upload):
                 cmd.extend(["--password", config.password])
 
             logger.info(f"Running: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True)
 
-            if result.returncode != 0:
-                raise ValueError(f"Nexus build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
+            if config.dry_run:
+                logger.info(f"DRY RUN: wheel files from dist directory: {wheel_file}")
+                logger.info(f"DRY RUN: cmd: {cmd}")
+            else:
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                if result.returncode != 0:
+                    raise ValueError(f"Nexus build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
 
             logger.info("Package deployed to Nexus successfully")
             return True
