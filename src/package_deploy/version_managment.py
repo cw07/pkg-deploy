@@ -16,9 +16,10 @@ class VersionManager:
         self.toml_config = load_config(pyproject_path)
 
     def get_current_version(self) -> str:
-        return self.toml_config['project']['version']
+        return str(self.toml_config['project']['version'])
 
-    def resolve_new_version(self, current_version: str, version_type: str) -> str:
+    @staticmethod
+    def resolve_new_version(current_version: str, version_type: str) -> str:
         version_info = parse_prerelease(current_version)
         major = version_info['major']
         minor = version_info['minor']
@@ -95,7 +96,7 @@ class VersionManager:
         logger.info(f"Version bumped from {current_version} to {new_version}")
         return new_version
 
-    def update_bumpversion_files(self, current_version: str, new_version: str):
+    def update_bumpversion_files(self, current_version: str, new_version: str) -> None:
         """Update files configured in [tool.bumpversion.file] section."""
         bumpversion_config = self.toml_config.get('tool', {}).get('bumpversion', {})
         files = bumpversion_config.get('file', [])

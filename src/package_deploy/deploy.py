@@ -190,7 +190,7 @@ class PackageDeploy:
 
             logger.info('Deploy completed')
         except Exception as e:
-            logger.error(f"Deployment failed: {e}")
+            logger.error(f"Deployment failed: {e}", exc_info=True)
             return False
 
     @staticmethod
