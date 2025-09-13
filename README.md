@@ -40,7 +40,7 @@ my-package/
 ├── README.md
 └── deploy.py  ← Create this file
 ```
-
+with the following contents:
 ```python
 from pkg_deploy import PackageDeploy
 PackageDeploy().deploy()
