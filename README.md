@@ -29,7 +29,18 @@ pip install pkg-deploy
 
 ### Basic Usage
 
-Create a `deploy.py` file in your project directory:
+Create a `deploy.py` file in your project root directory (the same folder containing your `pyproject.toml`):
+```text
+my-package/
+├── src/
+│   └── my_package/
+│       ├── __init__.py
+│       └── main.py
+├── pyproject.toml
+├── README.md
+└── deploy.py  ← Create this file
+```
+
 ```python
 from pkg_deploy import PackageDeploy
 PackageDeploy().deploy()
@@ -110,7 +121,9 @@ replace = '__version__ = "{new_version}"'
 
 ### .pypirc Configuration
 
-For repository authentication, create a `.pypirc` file in your home directory:
+For repository authentication, create a `.pypirc` file in your user home directory:
+- Unix/macOS: `~/.pypirc`
+- Windows: `C:\Users\username\.pypirc`
 
 ```ini
 [distutils]
