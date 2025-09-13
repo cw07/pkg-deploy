@@ -9,7 +9,7 @@ import argparse
 import subprocess
 import configparser
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 from tomlkit.toml_document import TOMLDocument
 
 
@@ -43,42 +43,31 @@ def setup_uv_compatibility():
         return False
 
 
-def get_credentials(args) -> tuple[Optional[str], Optional[str]]:
-    username = args.username
-    password = args.password
-    is_pypi = args.repository_name and "pypi" in args.repository_name.lower()
-    force_interactive = args.interactive
-
-    if is_pypi:
-        logger.info(" Detected PyPI repository - API tokens are recommended over passwords")
-
-    if not args.dry_run and (force_interactive or (not username and not password)):
-        logger.info(f"\n Repository Authentication Required")
+def get_credentials(username: Optional[str] = None,
+                    password: Optional[str] = None,
+                    url: str = "",
+                    is_pypi: bool = False
+                    ) -> Tuple[Optional[str], Optional[str]]:
+    is_pypi = "upload.pypi.org" in url or is_pypi
+    if not username:
         if is_pypi:
-            logger.info(f"PyPI Repository: https://pypi.org/")
-            logger.info(" Tip: Use API tokens instead of passwords for better security")
+            logger.info("For PyPI API tokens, use '__token__' as username")
+            username = "__token__"
         else:
-            logger.info(f"Repository: {args.repository_url}")
-        logger.info("-" * 60)
+            username = input(f"Please enter username for {url}:").strip()
 
-    if is_pypi:
-        logger.info("For PyPI API tokens, use '__token__' as username")
-        username_input = input("Username (default: __token__): ").strip()
-        username = username_input if username_input else "__token__"
-    else:
-        username_input = input("Username (default: admin): ").strip()
-        username = username_input if username_input else "admin"
+    if not username:
+        raise ValueError("Username cannot be empty")
 
-    if username:
-        logger.info(f"Using username: {username}")
-
-    if username == "__token__":
-        password = getpass.getpass("API Token (pypi-...): ")
-    else:
-        password = getpass.getpass("Password: ")
+    logger.info(f"Using username: {username}")
 
     if not password:
-        logger.info(f"Password/Token cannot be empty")
+        if is_pypi:
+            password = getpass.getpass("PyPI API token: ")
+        else:
+            password = getpass.getpass(f"Please enter password for {url}:")
+
+    if not password:
         raise ValueError("Password/Token cannot be empty")
 
     return username, password

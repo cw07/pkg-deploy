@@ -6,11 +6,27 @@ build-backend = "setuptools.build_meta"
 name = "pkg-deploy"
 version = "1.0.1"
 description = "Modern Python Package Deployment Tool"
-requires-python = ">=3.10"
+requires-python = ">=3.8"
 authors = [
-    { name = "cw"},
+    { name = "cw", email = "cw.devworks@gmail.com"},
 ]
 readme = "README.md"
+license = {text = "Apache-2.0"}
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: System :: Software Distribution",
+    "Operating System :: OS Independent",
+]
 dependencies = [
     "toml",
     "tomlkit",

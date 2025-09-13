@@ -42,16 +42,25 @@ class NexusUpload(Upload):
             wheel_file = self.get_wheel_files(config)
 
             cmd = [sys.executable, "-m", "twine", "upload",
-                   "--repository-url", config.repository_url,
                    f"dist/{wheel_file}",
                    "--disable-progress-bar"
                    ]
-            if config.username:
-                cmd.extend(["--username", config.username])
-            if config.password:
-                cmd.extend(["--password", config.password])
 
-            logger.info(f"Running: {' '.join(cmd)}")
+            if config.repository_name != "pypi":
+                cmd.extend(["--repository-url", config.repository_url])
+
+            cmd.extend(["--username", config.username])
+            cmd.extend(["--password", config.password])
+
+            # Create masked command for logging
+            masked_cmd = []
+            for i, arg in enumerate(cmd):
+                if i > 0 and cmd[i - 1] == "--password":
+                    masked_cmd.append("******")
+                else:
+                    masked_cmd.append(arg)
+
+            logger.info(f"Running: {' '.join(masked_cmd)}")
 
             if config.dry_run:
                 logger.info(f"DRY RUN: wheel files from dist directory: {wheel_file}")

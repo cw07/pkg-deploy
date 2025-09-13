@@ -70,7 +70,7 @@ def parse_args(args):
     )
 
     parser.add_argument(
-        "--repository-url", "-rl",
+        "--repository-url", "-ru",
         help="Repository URL"
     )
 
@@ -85,15 +85,15 @@ def parse_args(args):
     )
 
     parser.add_argument(
-        "--no-git-push",
+        "--skip-git-push",
         action="store_true",
-        help="Push local changes to Git repository after build"
+        help="Don't push version changes and new tag to Git repository after build"
     )
 
     parser.add_argument(
-        "--interactive", "-i",
+        "--skip-git-status-check",
         action="store_true",
-        help="Force interactive credential input (useful for Nexus)"
+        help="Skip git status check before deployment"
     )
 
     parser.add_argument(
@@ -126,18 +126,7 @@ class PackageDeploy:
 
         self.check_require_package(self.args.cython)
 
-        pypirc_info = get_pypirc_info()
-        repos = pypirc_info["repositories"]
-        if self.args.repository_name and self.args.repository_name in repos:
-            repository_info = repos[self.args.repository_name]
-            url = repository_info["repository"]
-            username = repository_info["username"]
-            password = repository_info["password"]
-        elif self.args.repository_name:
-            raise ValueError("Repository name is provided but not found in .pypirc")
-        else:
-            url = self.args.repository_url
-            username, password = get_credentials(self.args)
+        url, username, password = self.get_twine_upload_info()
 
         pyproject_path = self.args.project_dir / "pyproject.toml"
 
@@ -173,7 +162,8 @@ class PackageDeploy:
             logger.info(f"Starting deployment")
             
         try:
-            self.check_git_status()
+            if not self.args.skip_git_status_check:
+                self.check_git_status()
 
             new_version = self.version_manager.bump_version(
                 version_type=self.config.version_type,
@@ -199,7 +189,7 @@ class PackageDeploy:
 
             self.cleanup_build_files()
 
-            if uploaded and not self.args.no_git_push:
+            if uploaded and not self.args.skip_git_push:
                 self.git_push(new_version=new_version, dry_run=self.config.dry_run)
             else:
                 self.git_roll_back()
@@ -208,6 +198,44 @@ class PackageDeploy:
         except Exception as e:
             logger.error(f"Deployment failed: {e}", exc_info=True)
             return False
+
+    def get_twine_upload_info(self):
+        pypirc_info = get_pypirc_info()
+        repos = pypirc_info["repositories"]
+        if self.args.repository_name == "pypi":
+            url = None
+            username = "__token__"
+            password = None
+            if "pypi" in repos:
+                password = repos["pypi"].get("password")
+            if not password:
+                _, password = get_credentials(username=username, is_pypi=True)
+        elif self.args.repository_name and self.args.repository_name in repos:
+            repository_info = repos[self.args.repository_name]
+            url = repository_info.get("repository")
+            username = repository_info.get("username")
+            password = repository_info.get("password")
+            if not url:
+                raise ValueError(
+                    f"Repository '{self.args.repository_name}' must have a 'repository' url section in .pypirc"
+                    f"Only 'pypi' can omit the repository URL.")
+            if not username or not password:
+                username, password = get_credentials(
+                    username=username,
+                    password=password,
+                    url=url
+                )
+        elif self.args.repository_name and not self.args.repository_url:
+            raise ValueError(
+                f"Repository '{self.args.repository_name}' not found in .pypirc. "
+                f"Please provide --repository-url or add required info in .pypirc"
+            )
+        else:
+            url = self.args.repository_url
+            username, password = get_credentials(username=self.args.username,
+                                                 password=self.args.password,
+                                                 url=url)
+        return url, username, password
 
     @staticmethod
     def check_require_package(cython: bool):
