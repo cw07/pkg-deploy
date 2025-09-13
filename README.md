@@ -38,7 +38,7 @@ PackageDeploy().deploy()
 Running the Deployment
 You can run the deployment in two ways:
 
-Option 1: Command Line
+#### Option 1: Command Line
 Run the script directly with command-line arguments:
 
 ```bash
@@ -53,7 +53,7 @@ python deploy.py --repository-url https://nexus.example.com/repository/pypi-inte
 python deploy.py --repository-name pypi --version-type patch --dry-run
 ```
 
-Option 2: IDE with Arguments
+#### Option 2: IDE with Arguments
 If running from an IDE, modified the `deploy.py` file to run it programmatically:
 ```python
 import sys
