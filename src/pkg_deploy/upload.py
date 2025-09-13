@@ -36,9 +36,6 @@ class NexusUpload(Upload):
 
     def upload(self, config: DeployConfig, dist_dir: Path) -> bool:
         try:
-            if not config.repository_url:
-                raise ValueError("Repository URL is required for Nexus deployment")
-
             wheel_file = self.get_wheel_files(config)
 
             cmd = [sys.executable, "-m", "twine", "upload",
