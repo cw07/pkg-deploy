@@ -129,6 +129,34 @@ class CythonBuildStrategy(BuildStrategy):
 
     @staticmethod
     def create_setup_py_for_cython(project_dir: Path, toml_config: TOMLDocument):
+        setup_py_path = project_dir / "setup.py"
+        if setup_py_path.exists():
+            raise FileExistsError(
+                f"Cannot build Cython code: setup.py already exists at {setup_py_path}\n"
+                f"\n"
+                f"In Cython build mode, this tool generates its own setup.py file optimized for "
+                f"Cython compilation. An existing setup.py would be overwritten, potentially "
+                f"causing build errors or losing your custom configuration.\n"
+                f"\n"
+                f"To proceed with Cython build:\n"
+                f"  1. Migrate your setup.py settings to pyproject.toml:\n"
+                f"     - Move dependencies to [project.dependencies]\n"
+                f"     - Move metadata (name, version, description) to [project]\n"
+                f"     - Move entry points to [project.scripts]\n"
+                f"     - Move build configuration to [build-system] or [tool] sections\n"
+                f"  2. Back up your current setup.py: mv setup.py setup.py.backup\n"
+                f"  3. Then retry the Cython build\n"
+                f"\n"
+                f"Alternative (quick start):\n"
+                f"  - Just backup setup.py now: mv setup.py setup.py.backup\n"
+                f"  - Retry the build, then migrate settings later by comparing\n"
+                f"    setup.py.backup with the generated pyproject.toml\n"
+                f"\n"
+                f"Note: Modern Python projects use pyproject.toml (PEP 518/621) for "
+                f"configuration instead of setup.py. This approach provides better "
+                f"tooling integration and is the recommended standard."
+            )
+
         if "authors" in toml_config["project"]:
             author_names = ", ".join(p["name"] for p in toml_config["project"]["authors"] if "name" in p)
             author_emails = ", ".join(p["email"] for p in toml_config["project"]["authors"] if "email" in p)
