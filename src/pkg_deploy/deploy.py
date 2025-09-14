@@ -297,8 +297,15 @@ class PackageDeploy:
                 subprocess.check_output(['git', 'add', '.'], stderr=subprocess.STDOUT)
                 subprocess.check_output(['git', 'commit', '-m', f'Bump version to {new_version}'], stderr=subprocess.STDOUT)
                 tag_name = f"v{new_version}"
-                subprocess.check_output(['git', 'tag', '-a', tag_name, '-m', f'Release {tag_name}'], stderr=subprocess.STDOUT)
-                logger.info(f"Created Git tag: {tag_name}")
+                
+                # Check if the tag already exists
+                result = subprocess.run(['git', 'tag', '-l', tag_name], capture_output=True, text=True)
+                if result.stdout.strip():
+                    logger.warning(f"Warning: Git tag {tag_name} already exists, skipping tag creation")
+                else:
+                    subprocess.check_output(['git', 'tag', '-a', tag_name, '-m', f'Release {tag_name}'], stderr=subprocess.STDOUT)
+                    logger.info(f"Created Git tag: {tag_name}")
+
                 subprocess.check_output(['git', 'push', '--follow-tags'], stderr=subprocess.STDOUT)
                 logger.info('Pushing to github')
         except subprocess.CalledProcessError as ex:
