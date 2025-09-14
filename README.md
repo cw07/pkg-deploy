@@ -29,7 +29,9 @@ pip install pkg-deploy
 
 ### Basic Usage
 
-Create a `deploy.py` file in your project root directory (the same folder containing your `pyproject.toml`):
+After installing pkg-deploy , navigate to your project directory (the folder containing your pyproject.toml ) and use the pkg-deploy command directly. 
+Example project structure:
+
 ```text
 my-package/
 ├── src/
@@ -37,48 +39,23 @@ my-package/
 │       ├── __init__.py
 │       └── main.py
 ├── pyproject.toml
-├── README.md
-└── deploy.py  ← Create this file
-```
-With the following contents:
-```python
-from pkg_deploy import PackageDeploy
-PackageDeploy().deploy()
+└── README.md
 ```
 
 #### Running the Deployment
-You can run the deployment in two ways:
 
-#### Option 1: Command Line
-Run the script directly with command-line arguments:
+Use the `pkg-deploy` command with your desired arguments:
 
 ```bash
 # Deploy with patch version bump to PyPI
-python deploy.py --repository-name pypi --version-type patch
+pkg-deploy --repository-name pypi --version-type patch
 
 # Deploy to private repository with minor version bump
-python deploy.py --repository-url https://nexus.example.com/repository/pypi-internal/ \
-                 --username admin --password secret --version-type minor
+pkg-deploy --repository-url https://nexus.example.com/repository/pypi-internal/ \
+           --username admin --password secret --version-type minor
 
 # Dry run to test configuration
-python deploy.py --repository-name pypi --version-type patch --dry-run
-```
-
-#### Option 2: IDE with Arguments
-If running from an IDE, modified the `deploy.py` file to run it programmatically:
-```python
-import sys
-from pkg_deploy import PackageDeploy
-
-# Set arguments for IDE execution
-sys.argv = [
-    'deploy.py',
-    '--repository-name', 'pypi',
-    '--version-type', 'patch',
-    '--dry-run'
-]
-
-PackageDeploy().deploy()
+pkg-deploy --repository-name pypi --version-type patch --dry-run
 ```
 ## Configuration
 
@@ -148,48 +125,48 @@ password = your-password
 
 ```bash
 # Patch version bump (1.0.0 -> 1.0.1)
-python deploy.py --repository-name pypi --version-type patch
+pkg-deploy --repository-name pypi --version-type patch
 
 # Minor version bump (1.0.1 -> 1.1.0)
-python deploy.py --repository-name pypi --version-type minor
+pkg-deploy --repository-name pypi --version-type minor
 
 # Major version bump (1.1.0 -> 2.0.0)
-python deploy.py --repository-name pypi --version-type major
+pkg-deploy --repository-name pypi --version-type major
 
 # Use specific version
-python deploy.py --repository-name pypi --new-version 2.1.0
+pkg-deploy --repository-name pypi --new-version 2.1.0
 
 # Pre-release versions
-python deploy.py --repository-name pypi --version-type alpha  # 1.0.0a1
-python deploy.py --repository-name pypi --version-type beta   # 1.0.0b1
-python deploy.py --repository-name pypi --version-type rc     # 1.0.0rc1
+pkg-deploy --repository-name pypi --version-type alpha  # 1.0.0a1
+pkg-deploy --repository-name pypi --version-type beta   # 1.0.0b1
+pkg-deploy --repository-name pypi --version-type rc     # 1.0.0rc1
 ```
 
 ### Cython Builds
 
 ```bash
 # Build with Cython optimization
-python deploy.py --repository-name pypi --version-type patch --cython
+pkg-deploy --repository-name pypi --version-type patch --cython
 
 # Cython build for private repository
-python deploy.py --repository-url https://nexus.example.com/repository/pypi-internal/ \
-                 --username admin --password secret --cython
+pkg-deploy --repository-url https://nexus.example.com/repository/pypi-internal/ \
+           --username admin --password secret --cython
 ```
 
 ### Advanced Options
 
 ```bash
 # Custom project directory
-python deploy.py --project-dir /path/to/project --repository-name pypi
+pkg-deploy --project-dir /path/to/project --repository-name pypi
 
 # Skip Git operations
-python deploy.py --repository-name pypi --skip-git-push
+pkg-deploy --repository-name pypi --skip-git-push
 
 # Verbose logging
-python deploy.py --repository-name pypi --verbose
+pkg-deploy --repository-name pypi --verbose
 
 # Dry run with verbose output
-python deploy.py --repository-name pypi --dry-run --verbose
+pkg-deploy --repository-name pypi --dry-run --verbose
 ```
 
 ## Command Line Interface
@@ -264,7 +241,7 @@ Solution: Verify credentials, use API tokens for PyPI, or enable interactive mod
 Enable verbose logging for detailed troubleshooting:
 
 ```bash
-python deploy.py --repository-name pypi --verbose --dry-run
+pkg-deploy --repository-name pypi --verbose --dry-run
 ```
 
 ---
