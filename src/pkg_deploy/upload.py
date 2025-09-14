@@ -39,7 +39,8 @@ class NexusUpload(Upload):
 
             cmd = [sys.executable, "-m", "twine", "upload",
                    f"dist/{wheel_file}",
-                   "--disable-progress-bar"
+                   "--disable-progress-bar",
+                   "--verbose"
                    ]
 
             if config.repository_name != "pypi":
