@@ -36,6 +36,9 @@ dependencies = [
     "setuptools>=70",
 ]
 
+[project.scripts]
+pkg-deploy = "pkg_deploy.deploy:main"
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 zip-safe = false

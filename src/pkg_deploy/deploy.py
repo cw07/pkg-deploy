@@ -324,3 +324,9 @@ class PackageDeploy:
         return NexusUpload()
 
 
+def main():
+    PackageDeploy().deploy()
+
+
+if __name__ == "__main__":
+    main()
