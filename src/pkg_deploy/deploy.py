@@ -119,7 +119,9 @@ class PackageDeploy:
         args = sys.argv[1:]
         self.args = parse_args(args)
         if not (self.args.project_dir / "pyproject.toml").exists():
-            raise ValueError("pyproject.toml not found")
+            raise ValueError(f"pyproject.toml not found under project directory: {self.args.project_dir}")
+        else:
+            pyproject_path = self.args.project_dir / "pyproject.toml"
 
         if self.args.verbose:
             logging.getLogger().setLevel(logging.DEBUG)
@@ -127,8 +129,6 @@ class PackageDeploy:
         self.check_require_package(self.args.cython)
 
         url, username, password = self.get_twine_upload_info()
-
-        pyproject_path = self.args.project_dir / "pyproject.toml"
 
         self.version_manager = VersionManager(pyproject_path)
         self.config = DeployConfig(
