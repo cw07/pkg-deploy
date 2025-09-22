@@ -263,7 +263,9 @@ class PackageDeploy:
         egg_info_name = self.config.package_name.replace("-", "_")
         shutil.rmtree(f'src/{egg_info_name}.egg-info', ignore_errors=True)
         launcher_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+        logger.debug(f"Launcher dir: {launcher_dir}")
         directory = os.path.join(launcher_dir, 'src', self.config.package_name.replace("-", "_"))
+        logger.debug(f"The directory is: {directory}")
         c_files = glob.glob(os.path.join(directory, '**', '*.c'), recursive=True)
         if not self.setup_file_exist:
             Path("setup.py").unlink(missing_ok=True)
