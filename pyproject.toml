@@ -11,7 +11,7 @@ authors = [
     { name = "cw", email = "cw.devworks@gmail.com"},
 ]
 readme = "README.md"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
 classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Development Status :: 4 - Beta",
