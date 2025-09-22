@@ -37,15 +37,7 @@ class BuildStrategy(ABC):
     @staticmethod
     def build_cmd(cython: bool=False):
         if cython:
-            cmd = [
-                'cibuildwheel',
-                '--python', '3.8',
-                '--python', '3.9',
-                '--python', '3.10',
-                '--python', '3.11',
-                '--python', '3.12',
-                '--python', '3.13'
-            ]
+            cmd = ['cibuildwheel']
         elif is_uv_venv():
             ensure_uv_installed()
             cmd = ["uv", "build", "--wheel"]
