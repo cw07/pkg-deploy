@@ -267,6 +267,8 @@ class PackageDeploy:
         c_files = glob.glob(os.path.join(directory, '**', '*.c'), recursive=True)
         if not self.setup_file_exist:
             Path("setup.py").unlink(missing_ok=True)
+        if c_files:
+            logger.info(f"Cleaning up c files: {c_files}")
         for file_path in c_files:
             Path(file_path).unlink(missing_ok=True)
 
