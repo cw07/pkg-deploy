@@ -52,5 +52,4 @@ search = '__version__ = "{current_version}"'
 replace = '__version__ = "{new_version}"'
 
 [tool.cibuildwheel]
-python = ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
-platforms = ["linux", "windows", "macos"]
+platforms = ["linux", "macos"]  # only use cibuildwheel for linux

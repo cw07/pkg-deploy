@@ -37,7 +37,15 @@ class BuildStrategy(ABC):
     @staticmethod
     def build_cmd(cython: bool=False):
         if cython:
-            cmd = ['cibuildwheel']
+            cmd = [
+                'cibuildwheel',
+                '--python', '3.8',
+                '--python', '3.9',
+                '--python', '3.10',
+                '--python', '3.11',
+                '--python', '3.12',
+                '--python', '3.13'
+            ]
         elif is_uv_venv():
             ensure_uv_installed()
             cmd = ["uv", "build", "--wheel"]
@@ -79,6 +87,7 @@ class CythonBuildStrategy(BuildStrategy):
             env['CYTHONIZE'] = '1'
             env['PYTHONIOENCODING'] = 'utf-8'
             env['PYTHONUTF8'] = '1'
+            env["CIBW_BUILD_VERBOSITY"] = "1"
             result = subprocess.run(
                 cmd,
                 capture_output=True,
