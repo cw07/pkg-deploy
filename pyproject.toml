@@ -32,7 +32,7 @@ dependencies = [
     "tomlkit",
     "build",
     "twine",
-    "Cython",
+    "Cython>=3.0.6",
     "setuptools>=70",
 ]
 
