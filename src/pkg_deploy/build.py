@@ -35,8 +35,10 @@ class DeployConfig:
 class BuildStrategy(ABC):
 
     @staticmethod
-    def build_cmd():
-        if is_uv_venv():
+    def build_cmd(cython: bool=False):
+        if cython:
+            cmd = ['cibuildwheel']
+        elif is_uv_venv():
             ensure_uv_installed()
             cmd = ["uv", "build", "--wheel"]
         else:
@@ -51,7 +53,7 @@ class BuildStrategy(ABC):
 class StandardBuildStrategy(BuildStrategy):
 
     def build(self, config: DeployConfig, toml_config: TOMLDocument) -> bool:
-        cmd = self.build_cmd()
+        cmd = self.build_cmd(cython=False)
         logger.info(f"Running: {' '.join(cmd)}")
         result = subprocess.run(
             cmd,
@@ -71,7 +73,7 @@ class CythonBuildStrategy(BuildStrategy):
         try:
             self.prepare_pyproject_for_cython_build(config.project_dir, toml_config)
             self.create_setup_py_for_cython(config.project_dir, toml_config)
-            cmd = self.build_cmd()
+            cmd = self.build_cmd(cython=True)
             logger.info(f"Running Cython build: {' '.join(cmd)}")
             env = os.environ.copy()
             env['CYTHONIZE'] = '1'
