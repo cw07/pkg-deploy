@@ -11,7 +11,7 @@ authors = [
     { name = "cw", email = "cw.devworks@gmail.com"},
 ]
 readme = "README.md"
-license = "Apache-2.0"
+license = { text = "Apache-2.0" }
 classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Development Status :: 4 - Beta",
@@ -52,4 +52,17 @@ search = '__version__ = "{current_version}"'
 replace = '__version__ = "{new_version}"'
 
 [tool.cibuildwheel]
-platforms = ["linux", "macos"]  # only use cibuildwheel for linux
+build = "cp38-* cp39-* cp310-* cp311-* cp312-* cp313-*"
+before-build = "pip install Cython>=3.0.6"
+
+[tool.cibuildwheel.linux]
+# Use manylinux images for better compatibility
+before-all = "yum install -y gcc || apt-get update && apt-get install -y gcc"
+
+[tool.cibuildwheel.macos]
+# Ensure Cython is available for macOS builds
+before-build = "pip install Cython>=3.0.6"
+
+[tool.cibuildwheel.windows]
+# Ensure Cython is available for Windows builds
+before-build = "pip install Cython>=3.0.6"
