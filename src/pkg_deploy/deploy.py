@@ -197,7 +197,8 @@ class PackageDeploy:
 
             logger.info('Deploy completed')
         except Exception as e:
-            logger.error(f"Deployment failed: {e}", exc_info=True)
+            logger.error(f"Deployment failed, rolling back: {e}", exc_info=True)
+            self.git_roll_back()
             return False
 
     def get_twine_upload_info(self):
