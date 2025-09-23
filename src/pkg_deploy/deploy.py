@@ -317,9 +317,11 @@ class PackageDeploy:
         except subprocess.CalledProcessError as ex:
             logger.error(f"Git command failed: {ex.output.decode()}")
             logger.warning('Failed to push bump version commit. Please push manually.')
+            raise
         except Exception as ex:
             logger.error(f"Unexpected error: {ex}")
             logger.warning('Failed to push bump version commit. Please push manually.')
+            raise
 
     @staticmethod
     def git_roll_back():
