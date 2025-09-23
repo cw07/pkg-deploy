@@ -327,6 +327,7 @@ class PackageDeploy:
     def git_roll_back():
         try:
             subprocess.check_output(['git', 'restore', '.'], stderr=subprocess.STDOUT)
+            subprocess.check_output(['git', 'clean', '-fd'], stderr=subprocess.STDOUT)
             logger.info('Restored changes')
         except subprocess.CalledProcessError as ex:
             logger.error(f"Git command failed: {ex.output.decode()}")
