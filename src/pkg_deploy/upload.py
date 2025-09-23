@@ -30,7 +30,7 @@ class NexusUpload(Upload):
                 wheel_files.append(binary.name)
 
         if len(wheel_files) < 1:
-            raise ValueError(f"No wheel files found under {config.project_dir / "dist"}")
+            raise ValueError(f"No wheel files found under {config.project_dir / 'dist'}")
         else:
             logger.info(f"Built {len(wheel_files)} wheel files: {wheel_files}")
             for file in wheel_files:
