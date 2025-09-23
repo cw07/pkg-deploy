@@ -145,7 +145,7 @@ class PackageDeploy:
             version_type=self.args.version_type,
             new_version=self.args.new_version,
             use_cython=self.args.cython,
-            use_cibuildwheel=self.args.clibuildwheel,
+            use_cibuildwheel=self.args.cibuildwheel,
             is_uv_venv=is_uv_venv(),
             repository_name=self.args.repository_name,
             repository_url=url,
