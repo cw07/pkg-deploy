@@ -177,7 +177,7 @@ class CythonBuildStrategy(BuildStrategy):
         from setuptools.dist import Distribution
         from setuptools.command.build_py import build_py as _build_py
     
-        py_files = glob.glob("src/**/**/*.py", recursive=True)
+        py_files = glob.glob("src/**/*.py", recursive=True)
         py_files = [f for f in py_files if not f.endswith("__init__.py")]
     
         class build_py(_build_py):
