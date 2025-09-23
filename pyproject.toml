@@ -32,7 +32,7 @@ dependencies = [
     "tomlkit",
     "build",
     "twine",
-    "Cython>=3.0.6",
+    "Cython",
     "setuptools>=70",
 ]
 
@@ -53,7 +53,7 @@ replace = '__version__ = "{new_version}"'
 
 [tool.cibuildwheel]
 build = "cp38-* cp39-* cp310-* cp311-* cp312-* cp313-*"
-before-build = "pip install 'Cython>=3.0.6'"
+before-build = "pip install Cython"
 
 [tool.cibuildwheel.linux]
 # Use manylinux images for better compatibility
@@ -61,8 +61,8 @@ before-all = "yum install -y gcc || apt-get update && apt-get install -y gcc"
 
 [tool.cibuildwheel.macos]
 # Ensure Cython is available for macOS builds
-before-build = "pip install 'Cython>=3.0.6'"
+before-build = "pip install Cython"
 
 [tool.cibuildwheel.windows]
 # Ensure Cython is available for Windows builds
-before-build = "pip install 'Cython>=3.0.6'"
+before-build = "pip install Cython"
