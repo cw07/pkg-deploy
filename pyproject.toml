@@ -34,6 +34,7 @@ dependencies = [
     "twine",
     "Cython",
     "setuptools>=70",
+    "cibuildwheel",
 ]
 
 [project.scripts]

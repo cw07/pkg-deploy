@@ -150,8 +150,66 @@ pkg-deploy --repository-name pypi --version-type patch --cython
 
 # Cython build for private repository
 pkg-deploy --repository-url https://nexus.example.com/repository/pypi-internal/ \
-           --username admin --password secret --cython
+           --username user_name --password secret --cython
 ```
+
+### Cross-Platform Multiple Version Builds with cibuildwheel
+
+`pkg-deploy` supports `cibuildwheel` for building wheels across multiple Python versions and platforms as specified in your `pyproject.toml` configuration.
+
+#### Benefits
+- **Cython Integration**: Build wheels for all specified versions in one run
+- **Multi-Platform Support**: Automatically builds wheels for Linux, macOS, and Windows
+- **Multiple Python Versions**: Builds for all Python versions specified in configuration
+- **Binary Compatibility**: Creates optimized binary wheels with proper platform tags
+
+#### Requirements
+- **Docker (Linux only)**: Docker must be installed and running when building on Linux systems
+- **cibuildwheel**: Automatically installed as a build dependency
+- **Sufficient disk space**: Cross-platform builds require more storage
+
+#### Configuration
+
+Add cibuildwheel configuration to your `pyproject.toml` (Optional):
+
+```toml
+[tool.cibuildwheel]
+# Specify which Python versions to build for
+build = "cp38-* cp39-* cp310-* cp311-* cp312-* cp313-*"
+before-build = "pip install Cython"
+
+[tool.cibuildwheel.linux]
+# Use manylinux images for better compatibility
+before-all = "yum install -y gcc || apt-get update && apt-get install -y gcc"
+
+[tool.cibuildwheel.macos]
+# Ensure Cython is available for macOS builds
+before-build = "pip install Cython"
+
+[tool.cibuildwheel.windows]
+# Ensure Cython is available for Windows builds
+before-build = "pip install Cython"
+```
+
+#### Usage Examples
+
+```bash
+# Cross-platform Cython build with cibuildwheel
+pkg-deploy --repository-name pypi --version-type patch --cython --cibuildwheel
+
+# Deploy to private repository with cross-platform builds
+pkg-deploy --repository-url https://nexus.example.com/repository/pypi-internal/ \
+           --username admin --password secret --cython --cibuildwheel
+
+# Dry run to test cross-platform build configuration
+pkg-deploy --repository-name pypi --cython --cibuildwheel --dry-run
+```
+
+#### Limitations
+- **Build Time**: Cross-platform builds take significantly longer than single-platform builds
+- **Docker Dependency**: Linux builds require Docker to be installed and running
+- **Resource Usage**: Requires more CPU, memory, and disk space during build process
+- **Platform Restrictions**: Some platform-specific dependencies may not be available across all targets
 
 ### Advanced Options
 
@@ -177,6 +235,7 @@ pkg-deploy --repository-name pypi --dry-run --verbose
 - `--version-type, -vt`: Version bump type: patch, minor, major, alpha, beta, or rc
 - `--new-version, -v`: Specify exact version number (overrides version-type)
 - `--cython, -c`: Enable Cython compilation for performance
+- `--cibuildwheel`: Use cibuildwheel for cross-platform wheel building (requires Docker on Linux)
 - `--repository-name, -rn`: Repository name from .pypirc configuration (e.g., 'pypi', 'testpypi')
 - `--repository-url, -rl`: Repository upload URL (prompts for username/password if not in .pypirc)
 - `--username, -u`: Authentication username (optional if configured in .pypirc)
@@ -229,6 +288,18 @@ Solution: Install missing packages with `pip install build twine`.
 Error: Cannot build Cython code: setup.py already exists
 ```
 Solution: Backup existing `setup.py` or migrate configuration to `pyproject.toml`.
+
+**Docker Not Available (Linux)**
+```
+Error: Docker is required for cibuildwheel on Linux
+```
+Solution: Install and start Docker service, or use `--cython` without `--cibuildwheel` for local builds only.
+
+**cibuildwheel Build Failures**
+```
+Error: cibuildwheel build failed
+```
+Solution: Check Docker is running (Linux), verify `pyproject.toml` cibuildwheel configuration, and ensure sufficient disk space.
 
 **Authentication Failures**
 ```

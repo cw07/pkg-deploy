@@ -66,9 +66,9 @@ def parse_args(args):
     )
 
     parser.add_argument(
-        "--clibuildwheel",
+        "--cibuildwheel",
         action="store_true",
-        help="Use clibuildwheel to build cython code"
+        help="Use cibuildwheel to build cython code"
     )
 
     parser.add_argument(
@@ -145,7 +145,7 @@ class PackageDeploy:
             version_type=self.args.version_type,
             new_version=self.args.new_version,
             use_cython=self.args.cython,
-            use_clibuildwheel=self.args.clibuildwheel,
+            use_cibuildwheel=self.args.clibuildwheel,
             is_uv_venv=is_uv_venv(),
             repository_name=self.args.repository_name,
             repository_url=url,

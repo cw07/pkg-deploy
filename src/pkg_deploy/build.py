@@ -24,7 +24,7 @@ class DeployConfig:
     version_type: str
     new_version: str
     use_cython: bool
-    use_clibuildwheel: bool
+    use_cibuildwheel: bool
     is_uv_venv: bool
     repository_name: str
     repository_url: Optional[str] = None
@@ -37,7 +37,7 @@ class BuildStrategy(ABC):
 
     @staticmethod
     def build_cmd(config: DeployConfig):
-        if config.use_clibuildwheel:
+        if config.use_cibuildwheel:
             cmd = ['cibuildwheel', '--output-dir', 'dist']
         elif is_uv_venv():
             ensure_uv_installed()
