@@ -96,6 +96,33 @@ search = '__version__ = "{current_version}"'
 replace = '__version__ = "{new_version}"'
 ```
 
+### Package Directory Resolution
+
+`pkg-deploy` automatically resolves the package directory using the following priority:
+
+1. **Explicit --package-dir**: If specified via command line, this path is used directly
+2. **pyproject.toml Configuration**: Automatically parsed from setuptools configuration:
+   - `tool.setuptools.packages.find.where` - source directory location
+   - `tool.setuptools.package-dir` - package directory mapping
+3. **Default Fallback**: Uses `project_dir/package_name` based on the project name
+
+Example configurations in `pyproject.toml`:
+
+```toml
+# Standard src layout
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# Custom package location
+[tool.setuptools]
+package-dir = {"my_package" = "custom/path"}
+```
+
+> **⚠️ Important**: When package directory is configured in multiple places within `pyproject.toml` (such as both `tool.setuptools.packages.find.where` and `tool.setuptools.package-dir`), all configurations must point to the same directory. If they differ, `pkg-deploy` will raise a `ValueError` with the message "Package directory from toml are not the same".
+
 ### .pypirc Configuration
 
 For repository authentication, create a `.pypirc` file in your user home directory:
@@ -217,6 +244,9 @@ pkg-deploy --repository-name pypi --cython --cibuildwheel --dry-run
 # Custom project directory
 pkg-deploy --project-dir /path/to/project --repository-name pypi
 
+# Custom package directory
+pkg-deploy --package-dir /path/to/package --repository-name pypi
+
 # Skip Git operations
 pkg-deploy --repository-name pypi --skip-git-push
 
@@ -232,6 +262,7 @@ pkg-deploy --repository-name pypi --dry-run --verbose
 ### Arguments
 
 - `--project-dir`: Project directory (default: current directory)
+- `--package-dir`: Package directory path (default: auto-resolved from pyproject.toml or project name)
 - `--version-type, -vt`: Version bump type: patch, minor, major, alpha, beta, or rc
 - `--new-version, -v`: Specify exact version number (overrides version-type)
 - `--cython, -c`: Enable Cython compilation for performance

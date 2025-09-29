@@ -2,6 +2,8 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+from tomlkit import TOMLDocument
+
 from .utils import parse_prerelease, load_config, save_config
 
 
@@ -11,9 +13,9 @@ logger = logging.getLogger(__name__)
 class VersionManager:
     """Version Manager"""
 
-    def __init__(self, pyproject_path: Path):
+    def __init__(self, pyproject_path: Path, toml_config: TOMLDocument):
         self.pyproject_path = pyproject_path
-        self.toml_config = load_config(pyproject_path)
+        self.toml_config = toml_config
 
     def get_current_version(self) -> str:
         return str(self.toml_config['project']['version'])

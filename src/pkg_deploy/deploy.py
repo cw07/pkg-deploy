@@ -6,11 +6,12 @@ import logging
 import argparse
 import subprocess
 from pathlib import Path
+from tomlkit import TOMLDocument
 
 from .upload import Upload, NexusUpload
 from .version_managment import VersionManager
 from .build import DeployConfig, CythonBuildStrategy, StandardBuildStrategy
-from .utils import get_pypirc_info, get_credentials, is_uv_venv, validate_version_arg
+from .utils import get_pypirc_info, get_credentials, is_uv_venv, validate_version_arg, load_config
 
 
 logging.basicConfig(
@@ -44,6 +45,13 @@ def parse_args(args):
         type=Path,
         default=Path.cwd(),
         help="Project directory (default: current directory)"
+    )
+
+    parser.add_argument(
+        "--package-dir",
+        type=Path,
+        default=None,
+        help="Package directory (default: current directory)"
     )
 
     parser.add_argument(
@@ -136,11 +144,14 @@ class PackageDeploy:
         self.check_require_package(self.args.cython)
 
         url, username, password = self.get_twine_upload_info()
+        toml_config = load_config(pyproject_path)
+        package_dir = self.resolve_package_dir(toml_config)
 
-        self.version_manager = VersionManager(pyproject_path)
+        self.version_manager = VersionManager(pyproject_path, toml_config)
         self.config = DeployConfig(
-            package_name=self.version_manager.toml_config["project"]["name"],
+            package_name=toml_config["project"]["name"],
             project_dir=self.args.project_dir,
+            package_dir=package_dir,
             pyproject_path=pyproject_path,
             version_type=self.args.version_type,
             new_version=self.args.new_version,
@@ -157,11 +168,11 @@ class PackageDeploy:
 
     def deploy(self):
         logger.info("=== Deployment Configuration ===")
-        for arg_name, arg_value in vars(self.args).items():
-            display_value = arg_value
-            if arg_name in ('username', 'password') and arg_value is not None:
-                display_value = '***MASKED***'
-            logger.info(f"{arg_name}: {display_value}")
+        for field, value in vars(self.config).items():
+            if field == "password":
+                logger.info(f"{field}: ***MASKED***")
+            else:
+                logger.info(f"{field}: {value}")
         logger.info("=================================")
         
         if self.config.dry_run:
@@ -262,16 +273,31 @@ class PackageDeploy:
             logger.error(f"Install them with: pip install {' '.join(missing_packages)}")
             raise ValueError("Missing required packages")
 
+    def resolve_package_dir(self, toml_config: TOMLDocument) -> Path:
+        package_dir = self.args.project_dir / toml_config["project"]["name"]
+        if self.args.package_dir is not None:
+            package_dir = self.args.package_dir
+        else:
+            pkg_dir_candidates = []
+            if "tool" in toml_config and "setuptools" in toml_config["tool"]:
+                if "packages" in toml_config["tool"]["setuptools"]:
+                    pkg_dir_candidates.append(toml_config["tool"]["setuptools"]["packages"]["find"]["where"][0])
+                if "package-dir" in toml_config["tool"]["setuptools"]:
+                    pkg_dir_candidates.append(list(toml_config["tool"]["setuptools"]["package-dir"].values())[0])
+                if len(set(pkg_dir_candidates)) != 1:
+                    raise ValueError("Package directory from toml are not the same")
+                else:
+                    package_dir = self.args.project_dir / pkg_dir_candidates[0]
+        return package_dir
+
     def cleanup_build_files(self):
         logger.info('Deleting build, dist and egg-info files after deployment')
         shutil.rmtree('dist', ignore_errors=True)
         shutil.rmtree('build', ignore_errors=True)
-        shutil.rmtree(f'src/{self.config.package_name}.egg-info', ignore_errors=True)
+        shutil.rmtree(f'{self.config.package_dir}/{self.config.package_name}.egg-info', ignore_errors=True)
         egg_info_name = self.config.package_name.replace("-", "_")
-        shutil.rmtree(f'src/{egg_info_name}.egg-info', ignore_errors=True)
-        launcher_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-        logger.debug(f"Launcher dir: {launcher_dir}")
-        directory = os.path.join(launcher_dir, 'src', self.config.package_name.replace("-", "_"))
+        shutil.rmtree(f'{self.config.package_dir}/{egg_info_name}.egg-info', ignore_errors=True)
+        directory = self.config.package_dir
         logger.debug(f"The directory is: {directory}")
         c_files = glob.glob(os.path.join(directory, '**', '*.c'), recursive=True)
         if not self.setup_file_exist:

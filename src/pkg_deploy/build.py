@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 class DeployConfig:
     package_name: str
     project_dir: Path
+    package_dir: Path
     pyproject_path: Path
     version_type: str
     new_version: str
