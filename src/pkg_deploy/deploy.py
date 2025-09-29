@@ -152,6 +152,7 @@ class PackageDeploy:
             package_name=toml_config["project"]["name"],
             project_dir=self.args.project_dir,
             package_dir=package_dir,
+            package_entry=package_dir.name,
             pyproject_path=pyproject_path,
             version_type=self.args.version_type,
             new_version=self.args.new_version,
@@ -274,20 +275,28 @@ class PackageDeploy:
             raise ValueError("Missing required packages")
 
     def resolve_package_dir(self, toml_config: TOMLDocument) -> Path:
-        package_dir = self.args.project_dir / toml_config["project"]["name"]
+        package_dir = self.args.project_dir / toml_config["project"]["name"].replace("-", "_")
         if self.args.package_dir is not None:
             package_dir = self.args.package_dir
         else:
             pkg_dir_candidates = []
             if "tool" in toml_config and "setuptools" in toml_config["tool"]:
-                if "packages" in toml_config["tool"]["setuptools"]:
+                try:
                     pkg_dir_candidates.append(toml_config["tool"]["setuptools"]["packages"]["find"]["where"][0])
-                if "package-dir" in toml_config["tool"]["setuptools"]:
+                except Exception as e:
+                    logger.error(e)
+                try:
                     pkg_dir_candidates.append(list(toml_config["tool"]["setuptools"]["package-dir"].values())[0])
-                if len(set(pkg_dir_candidates)) != 1:
-                    raise ValueError("Package directory from toml are not the same")
+                except Exception as e:
+                    logger.error(e)
+                if len(set(pkg_dir_candidates)) > 1:
+                    raise ValueError(f"Package directory from toml are not the same: {pkg_dir_candidates}")
+                elif len(pkg_dir_candidates) == 0:
+                    logger.warning(f"No entry point find, use the default directory: {package_dir}")
                 else:
                     package_dir = self.args.project_dir / pkg_dir_candidates[0]
+        if not package_dir.exists():
+            raise FileNotFoundError(f"Failed to resolve package directory, directory not found: {package_dir}")
         return package_dir
 
     def cleanup_build_files(self):

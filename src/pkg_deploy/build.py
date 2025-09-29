@@ -21,6 +21,7 @@ class DeployConfig:
     package_name: str
     project_dir: Path
     package_dir: Path
+    package_entry: str
     pyproject_path: Path
     version_type: str
     new_version: str
@@ -74,7 +75,7 @@ class CythonBuildStrategy(BuildStrategy):
     def build(self, config: DeployConfig, toml_config: TOMLDocument) -> bool:
         try:
             self.prepare_pyproject_for_cython_build(config.project_dir, toml_config)
-            self.create_setup_py_for_cython(config.project_dir, toml_config)
+            self.create_setup_py_for_cython(config, toml_config)
             cmd = self.build_cmd(config=config)
             logger.info(f"Running Cython build: {' '.join(cmd)}")
             env = os.environ.copy()
@@ -133,8 +134,8 @@ class CythonBuildStrategy(BuildStrategy):
             logger.info("Restored original pyproject.toml")
 
     @staticmethod
-    def create_setup_py_for_cython(project_dir: Path, toml_config: TOMLDocument):
-        setup_py_path = project_dir / "setup.py"
+    def create_setup_py_for_cython(config: DeployConfig, toml_config: TOMLDocument):
+        setup_py_path = config.project_dir / "setup.py"
         if setup_py_path.exists():
             raise FileExistsError(
                 f"Cannot build Cython code: setup.py already exists at {setup_py_path}\n"
@@ -179,7 +180,7 @@ class CythonBuildStrategy(BuildStrategy):
         from setuptools.dist import Distribution
         from setuptools.command.build_py import build_py as _build_py
     
-        py_files = glob.glob("src/**/*.py", recursive=True)
+        py_files = glob.glob("{config.package_entry}/**/*.py", recursive=True)
         py_files = [f for f in py_files if not f.endswith("__init__.py")]
     
         class build_py(_build_py):
@@ -210,8 +211,8 @@ class CythonBuildStrategy(BuildStrategy):
             entry_points={{
                 'console_scripts': {entry_points}
             }},
-            packages=find_packages(where="src"),
-            package_dir={{"": "src"}},
+            packages=find_packages(where="{config.package_entry}"),
+            package_dir={{"": "{config.package_entry}"}},
             include_package_data=True,
             ext_modules=cythonize(
                 py_files,
@@ -224,5 +225,5 @@ class CythonBuildStrategy(BuildStrategy):
         )
         ''').strip()
 
-        with open(project_dir / "setup.py", 'w', encoding='utf-8') as f:
+        with open(config.project_dir / "setup.py", 'w', encoding='utf-8') as f:
             f.write(setup_py_content)
