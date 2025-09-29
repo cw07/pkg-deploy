@@ -168,17 +168,16 @@ class PackageDeploy:
             logger.info("DRY RUN: Starting deployment simulation")
         else:
             logger.info(f"Starting deployment")
+
+        if not self.args.skip_git_status_check:
+            self.check_git_status()
             
         try:
-            if not self.args.skip_git_status_check:
-                self.check_git_status()
-
             new_version = self.version_manager.bump_version(
                 version_type=self.config.version_type,
                 new_version=self.config.new_version,
                 dry_run=self.config.dry_run
             )
-            
             if self.config.dry_run:
                 logger.info(f"DRY RUN: Would bump version to: {new_version}")
             else:
@@ -201,7 +200,6 @@ class PackageDeploy:
                 self.git_push(new_version=new_version, dry_run=self.config.dry_run)
             else:
                 self.git_roll_back()
-
             logger.info('Deploy completed')
         except Exception as e:
             logger.error(f"Deployment failed, rolling back: {e}", exc_info=True)
