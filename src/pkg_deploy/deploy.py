@@ -280,21 +280,42 @@ class PackageDeploy:
             package_dir = self.args.package_dir
         else:
             pkg_dir_candidates = []
-            if "tool" in toml_config and "setuptools" in toml_config["tool"]:
-                try:
-                    pkg_dir_candidates.append(toml_config["tool"]["setuptools"]["packages"]["find"]["where"][0])
-                except Exception as e:
-                    logger.error(e)
-                try:
-                    pkg_dir_candidates.append(list(toml_config["tool"]["setuptools"]["package-dir"].values())[0])
-                except Exception as e:
-                    logger.error(e)
-                if len(set(pkg_dir_candidates)) > 1:
-                    raise ValueError(f"Package directory from toml are not the same: {pkg_dir_candidates}")
-                elif len(pkg_dir_candidates) == 0:
-                    logger.warning(f"No entry point find, use the default directory: {package_dir}")
+
+            # Safely extract 'packages.find.where'
+            where = (
+                toml_config
+                .get("tool", {})
+                .get("setuptools", {})
+                .get("packages", {})
+                .get("find", {})
+                .get("where")
+            )
+            if where and isinstance(where, list):
+                pkg_dir_candidates.append(where[0])
+            elif where is not None:
+                logger.warning("'tool.setuptools.packages.find.where' is not a list; skipping.")
+
+            # Safely extract first value from 'package-dir' dict
+            package_dir_map = (
+                toml_config
+                .get("tool", {})
+                .get("setuptools", {})
+                .get("package-dir")
+            )
+            if package_dir_map and isinstance(package_dir_map, dict) and package_dir_map:
+                first_value = next(iter(package_dir_map.values()))
+                if isinstance(first_value, str):
+                    pkg_dir_candidates.append(first_value)
                 else:
-                    package_dir = self.args.project_dir / pkg_dir_candidates[0]
+                    logger.warning("'tool.setuptools.package-dir' values should be strings; skipping.")
+
+            if len(set(pkg_dir_candidates)) > 1:
+                logger.warning(f"Package directory from toml are not the same: {pkg_dir_candidates}, use the default directory: {package_dir}")
+            elif len(pkg_dir_candidates) == 0:
+                logger.warning(f"No entry point find, use the default directory: {package_dir}")
+            else:
+                package_dir = self.args.project_dir / pkg_dir_candidates[0]
+
         if not package_dir.exists():
             raise FileNotFoundError(f"Failed to resolve package directory, directory not found: {package_dir}")
         return package_dir
