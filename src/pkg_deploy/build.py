@@ -137,6 +137,15 @@ class CythonBuildStrategy(BuildStrategy):
     def create_setup_py_for_cython(config: DeployConfig, toml_config: TOMLDocument):
         setup_py_path = config.project_dir / "setup.py"
         if setup_py_path.exists():
+            # Check if the existing setup.py already uses cythonize
+            with open(setup_py_path, 'r', encoding='utf-8') as f:
+                setup_content = f.read()
+            
+            if 'cythonize' in setup_content:
+                logger.info(f"Using existing setup.py with cythonize at {setup_py_path}")
+                return
+            
+            # If cythonize is not present, raise an error
             raise FileExistsError(
                 f"Cannot build Cython code: setup.py already exists at {setup_py_path}\n"
                 f"\n"

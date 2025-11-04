@@ -34,7 +34,10 @@ class NexusUpload(Upload):
         else:
             logger.info(f"Built {len(wheel_files)} wheel files: {wheel_files}")
             for file in wheel_files:
-                logger.info(f"Found valid package wheel: {file} ({dist_dir})")
+                file_path = dist_dir / file
+                size_bytes = file_path.stat().st_size
+                size_mb = size_bytes / (1024 * 1024)
+                logger.info(f"Found valid package wheel: {file} ({size_mb:.2f} MB)")
         return wheel_files
 
     def upload(self, config: DeployConfig, dist_dir: Path) -> bool:
