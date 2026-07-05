@@ -2,6 +2,7 @@ import os
 import sys
 import glob
 import shutil
+import zipfile
 import logging
 import argparse
 import subprocess
@@ -77,6 +78,12 @@ def parse_args(args):
         "--cibuildwheel",
         action="store_true",
         help="Use cibuildwheel to build cython code"
+    )
+
+    parser.add_argument(
+        "-m",
+        dest="minify",
+        action="store_true"
     )
 
     parser.add_argument(
@@ -158,6 +165,7 @@ class PackageDeploy:
             new_version=self.args.new_version,
             use_cython=self.args.cython,
             use_cibuildwheel=self.args.cibuildwheel,
+            use_minifier=self.args.minify,
             is_uv_venv=is_uv_venv(),
             repository_name=self.args.repository_name,
             repository_url=url,
@@ -201,12 +209,15 @@ class PackageDeploy:
                 build_strategy = StandardBuildStrategy()
 
             uploaded = False
-            if build_strategy.build(self.config, self.version_manager.toml_config):
-                upload_strategy = self.get_upload_strategy(self.config)
-                dist_dir = self.config.project_dir / "dist"
-                uploaded = upload_strategy.upload(self.config, dist_dir)
-
-            self.cleanup_build_files()
+            try:
+                if build_strategy.build(self.config, self.version_manager.toml_config):
+                    dist_dir = self.config.project_dir / "dist"
+                    if self.config.use_cython:
+                        self.check_wheel_no_source_leak(dist_dir)
+                    upload_strategy = self.get_upload_strategy(self.config)
+                    uploaded = upload_strategy.upload(self.config, dist_dir)
+            finally:
+                self.cleanup_build_files()
 
             if uploaded and not self.args.skip_git_push:
                 self.git_push(new_version=new_version, dry_run=self.config.dry_run)
@@ -319,6 +330,50 @@ class PackageDeploy:
         if not package_dir.exists():
             raise FileNotFoundError(f"Failed to resolve package directory, directory not found: {package_dir}")
         return package_dir
+
+    @staticmethod
+    def check_wheel_no_source_leak(dist_dir: Path):
+        """Inspect built wheels and refuse to continue if any source or
+        intermediate file leaked in. A Cython build should ship only compiled
+        extensions (.pyd/.so) plus __init__.py; anything else means a module
+        failed to cythonize or was excluded. Raises ValueError on a leak."""
+        wheels = sorted(dist_dir.glob("*.whl"))
+        if not wheels:
+            raise ValueError(f"No wheel found under {dist_dir} to inspect for source leaks")
+
+        source_suffixes = {".c", ".cpp", ".cxx", ".pyx", ".pxd", ".h", ".hpp", ".pdb"}
+        leaks = {}
+        for wheel in wheels:
+            found = []
+            with zipfile.ZipFile(wheel) as zf:
+                for name in zf.namelist():
+                    if name.endswith("/"):
+                        continue
+                    # metadata / data payload dirs are not code
+                    if ".dist-info/" in name or ".data/" in name:
+                        continue
+                    base = name.rsplit("/", 1)[-1]
+                    suffix = Path(base).suffix.lower()
+                    if base.endswith(".py") and base != "__init__.py":
+                        found.append(name)
+                    elif suffix in source_suffixes:
+                        found.append(name)
+            if found:
+                leaks[wheel.name] = found
+
+        if leaks:
+            detail = "\n".join(
+                f"  {w}:\n" + "\n".join(f"      - {f}" for f in files)
+                for w, files in leaks.items()
+            )
+            raise ValueError(
+                "Source leak detected in built wheel(s) - refusing to upload.\n"
+                "A Cython build should contain only compiled extensions (.pyd/.so) "
+                "plus __init__.py, but these source/intermediate files were found:\n"
+                f"{detail}\n"
+                "Likely a module failed to cythonize or was excluded from the build."
+            )
+        logger.info(f"Wheel source-leak check passed for: {[w.name for w in wheels]}")
 
     def cleanup_build_files(self):
         logger.info('Deleting build, dist and egg-info files after deployment')

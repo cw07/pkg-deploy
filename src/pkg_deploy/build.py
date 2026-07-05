@@ -27,6 +27,7 @@ class DeployConfig:
     new_version: str
     use_cython: bool
     use_cibuildwheel: bool
+    use_minifier: bool
     is_uv_venv: bool
     repository_name: str
     repository_url: Optional[str] = None
@@ -74,7 +75,7 @@ class CythonBuildStrategy(BuildStrategy):
 
     def build(self, config: DeployConfig, toml_config: TOMLDocument) -> bool:
         try:
-            self.prepare_pyproject_for_cython_build(config.project_dir, toml_config)
+            self.prepare_pyproject_for_cython_build(config, toml_config)
             self.create_setup_py_for_cython(config, toml_config)
             cmd = self.build_cmd(config=config)
             logger.info(f"Running Cython build: {' '.join(cmd)}")
@@ -83,6 +84,8 @@ class CythonBuildStrategy(BuildStrategy):
             env['PYTHONIOENCODING'] = 'utf-8'
             env['PYTHONUTF8'] = '1'
             env["CIBW_BUILD_VERBOSITY"] = "1"
+            if config.use_minifier and sys.platform != "win32":
+                self._apply_unix_strip_flags(env)
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -103,8 +106,32 @@ class CythonBuildStrategy(BuildStrategy):
                 self.restore_pyproject_toml(project_dir=config.project_dir, original_toml_config=toml_config)
 
     @staticmethod
-    def prepare_pyproject_for_cython_build(project_dir: Path, toml_config: TOMLDocument):
-        pyproject_path = project_dir / "pyproject.toml"
+    def _apply_unix_strip_flags(env: dict):
+        """Hide internal symbols and strip the symbol table from the compiled
+        extensions on Linux/macOS (no-op on Windows). This removes the C-level
+        symbol names (e.g. __pyx_pf_*) that a disassembler would use to navigate
+        the binary. It does not change runtime behaviour, and it cannot hide the
+        Python-visible names (__name__/__qualname__), which are stored as data."""
+        if sys.platform == "darwin":
+            cflags, ldflags = "-fvisibility=hidden", "-Wl,-x"
+        else:  # linux / other unix
+            cflags, ldflags = "-fvisibility=hidden", "-s"
+
+        def append(key: str, value: str):
+            current = env.get(key, "").strip()
+            env[key] = f"{current} {value}".strip()
+
+        append("CFLAGS", cflags)
+        append("LDFLAGS", ldflags)
+        # cibuildwheel compiles inside an isolated env/container, so host
+        # CFLAGS/LDFLAGS are not inherited unless forwarded via CIBW_ENVIRONMENT.
+        append("CIBW_ENVIRONMENT", f'CFLAGS="{cflags} $CFLAGS" LDFLAGS="{ldflags} $LDFLAGS"')
+        logger.info(f"Applied symbol-stripping flags for {sys.platform}: "
+                    f"CFLAGS+={cflags!r}, LDFLAGS+={ldflags!r}")
+
+    @staticmethod
+    def prepare_pyproject_for_cython_build(config: DeployConfig, toml_config: TOMLDocument):
+        pyproject_path = config.project_dir / "pyproject.toml"
         if pyproject_path.exists():
             new_config = copy.deepcopy(toml_config)
 
@@ -116,6 +143,8 @@ class CythonBuildStrategy(BuildStrategy):
                 new_config['build-system']['requires'] = []
 
             cython_deps = ['setuptools', 'Cython']
+            if config.use_minifier:
+                cython_deps.append('python-minifier')
             requires = new_config['build-system']['requires']
             for dep in cython_deps:
                 if not any(req.startswith(dep) for req in requires):
@@ -182,6 +211,48 @@ class CythonBuildStrategy(BuildStrategy):
             entry_points = [f"{k}={v}" for k, v in toml_config["project"]["scripts"].items()]
         else:
             entry_points = []
+
+        # Build the ext_modules construction. When minification is enabled, sources are
+        # minified in place right before cythonize() reads them, then restored, so the
+        # working tree is left untouched (the later git commit stays clean).
+        if config.use_minifier:
+            minify_lines = [
+                "from python_minifier import minify",
+                "_backups = {}",
+                "for _f in py_files:",
+                "    with open(_f, 'r', encoding='utf-8') as _fh:",
+                "        _src = _fh.read()",
+                "    _backups[_f] = _src",
+                "    with open(_f, 'w', encoding='utf-8') as _fh:",
+                "        _fh.write(minify(",
+                "            _src,",
+                "            filename=_f,",
+                "            remove_literal_statements=True,",
+                "            remove_annotations=False,",
+                "            rename_locals=True,",
+                "            rename_globals=False,",
+                "        ))",
+                "try:",
+                "    ext_modules = cythonize(",
+                "        py_files,",
+                "        compiler_directives={",
+                "            'language_level': '3',",
+                "            'docstrings': False,",
+                "            'emit_code_comments': False,",
+                "            'embedsignature': False,",
+                "        },",
+                "    )",
+                "finally:",
+                "    for _f, _src in _backups.items():",
+                "        with open(_f, 'w', encoding='utf-8') as _fh:",
+                "            _fh.write(_src)",
+            ]
+            setup_requires_literal = '["cython>=3.2", "python-minifier"]'
+        else:
+            minify_lines = ["ext_modules = cythonize(py_files, compiler_directives={'language_level': '3'})"]
+            setup_requires_literal = '["cython>=3.2"]'
+        minify_section = "\n        ".join(minify_lines)
+
         setup_py_content = textwrap.dedent(f'''
         import glob
         from Cython.Build import cythonize
@@ -191,6 +262,8 @@ class CythonBuildStrategy(BuildStrategy):
     
         py_files = glob.glob("{config.package_entry}/**/*.py", recursive=True)
         py_files = [f for f in py_files if not f.endswith("__init__.py")]
+
+        {minify_section}
     
         class build_py(_build_py):
             def find_package_modules(self, package, package_dir):
@@ -223,12 +296,9 @@ class CythonBuildStrategy(BuildStrategy):
             packages=find_packages(where="{config.package_entry}"),
             package_dir={{"": "{config.package_entry}"}},
             include_package_data=True,
-            ext_modules=cythonize(
-                py_files,
-                compiler_directives={{'language_level': "3"}},
-            ),
+            ext_modules=ext_modules,
             distclass=BinaryDistribution,
-            setup_requires=["cython>=3.1"],
+            setup_requires={setup_requires_literal},
             cmdclass={{'build_py': build_py}},
             zip_safe=False
         )

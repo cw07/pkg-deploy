@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=70", "Cython>=3.0.6"]
+requires = ["setuptools>=70", "Cython>=3.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -32,9 +32,10 @@ dependencies = [
     "tomlkit",
     "build",
     "twine",
-    "Cython",
+    "Cython>=3.2",
     "setuptools>=70",
     "cibuildwheel",
+    "python-minifier",
 ]
 
 [project.scripts]
