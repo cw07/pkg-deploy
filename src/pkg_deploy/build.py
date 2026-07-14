@@ -212,9 +212,9 @@ class CythonBuildStrategy(BuildStrategy):
         else:
             entry_points = []
 
-        # Build the ext_modules construction. When minification is enabled, sources are
-        # minified in place right before cythonize() reads them, then restored, so the
-        # working tree is left untouched (the later git commit stays clean).
+        # Build the ext_modules construction. Generated C sources go under build/cython
+        # so include_package_data cannot copy them into the wheel. When minification is
+        # enabled, Python sources are restored immediately after cythonize() reads them.
         if config.use_minifier:
             minify_lines = [
                 "from python_minifier import minify",
@@ -235,9 +235,9 @@ class CythonBuildStrategy(BuildStrategy):
                 "try:",
                 "    ext_modules = cythonize(",
                 "        py_files,",
+                "        build_dir='build/cython',",
                 "        compiler_directives={",
                 "            'language_level': '3',",
-                "            'docstrings': False,",
                 "            'emit_code_comments': False,",
                 "            'embedsignature': False,",
                 "        },",
@@ -249,7 +249,13 @@ class CythonBuildStrategy(BuildStrategy):
             ]
             setup_requires_literal = '["cython>=3.2", "python-minifier"]'
         else:
-            minify_lines = ["ext_modules = cythonize(py_files, compiler_directives={'language_level': '3'})"]
+            minify_lines = [
+                "ext_modules = cythonize(",
+                "    py_files,",
+                "    build_dir='build/cython',",
+                "    compiler_directives={'language_level': '3'},",
+                ")",
+            ]
             setup_requires_literal = '["cython>=3.2"]'
         minify_section = "\n        ".join(minify_lines)
 
@@ -296,6 +302,9 @@ class CythonBuildStrategy(BuildStrategy):
             packages=find_packages(where="{config.package_entry}"),
             package_dir={{"": "{config.package_entry}"}},
             include_package_data=True,
+            exclude_package_data={{
+                "": ["*.c", "*.cpp", "*.cxx", "*.pyx", "*.pxd", "*.h", "*.hpp", "*.pdb"],
+            }},
             ext_modules=ext_modules,
             distclass=BinaryDistribution,
             setup_requires={setup_requires_literal},

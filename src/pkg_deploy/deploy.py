@@ -1,6 +1,4 @@
-import os
 import sys
-import glob
 import shutil
 import zipfile
 import logging
@@ -349,12 +347,14 @@ class PackageDeploy:
                 for name in zf.namelist():
                     if name.endswith("/"):
                         continue
-                    # metadata / data payload dirs are not code
-                    if ".dist-info/" in name or ".data/" in name:
+                    # Wheel metadata is not importable package content.  Do not skip
+                    # .data/purelib or .data/platlib: installers move those files into
+                    # site-packages, so source files there are leaks too.
+                    if ".dist-info/" in name:
                         continue
                     base = name.rsplit("/", 1)[-1]
                     suffix = Path(base).suffix.lower()
-                    if base.endswith(".py") and base != "__init__.py":
+                    if suffix == ".py" and base.lower() != "__init__.py":
                         found.append(name)
                     elif suffix in source_suffixes:
                         found.append(name)
@@ -377,20 +377,17 @@ class PackageDeploy:
 
     def cleanup_build_files(self):
         logger.info('Deleting build, dist and egg-info files after deployment')
-        shutil.rmtree('dist', ignore_errors=True)
-        shutil.rmtree('build', ignore_errors=True)
-        shutil.rmtree(f'{self.config.package_dir}/{self.config.package_name}.egg-info', ignore_errors=True)
+        project_dir = Path(self.config.project_dir)
+        package_dir = Path(self.config.package_dir)
+        # Cython intermediates are generated under build/cython. Never recursively
+        # remove *.c from the package tree because projects may own those sources.
+        shutil.rmtree(project_dir / 'dist', ignore_errors=True)
+        shutil.rmtree(project_dir / 'build', ignore_errors=True)
+        shutil.rmtree(package_dir / f'{self.config.package_name}.egg-info', ignore_errors=True)
         egg_info_name = self.config.package_name.replace("-", "_")
-        shutil.rmtree(f'{self.config.package_dir}/{egg_info_name}.egg-info', ignore_errors=True)
-        directory = self.config.package_dir
-        logger.debug(f"The directory is: {directory}")
-        c_files = glob.glob(os.path.join(directory, '**', '*.c'), recursive=True)
+        shutil.rmtree(package_dir / f'{egg_info_name}.egg-info', ignore_errors=True)
         if not self.setup_file_exist:
-            Path("setup.py").unlink(missing_ok=True)
-        if c_files:
-            logger.info(f"Cleaning up c files: {c_files}")
-        for file_path in c_files:
-            Path(file_path).unlink(missing_ok=True)
+            (project_dir / "setup.py").unlink(missing_ok=True)
 
     def check_git_status(self):
         logger.info("Checking git status, --porcelain to make sure git repo is clean")
