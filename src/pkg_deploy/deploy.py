@@ -218,13 +218,18 @@ class PackageDeploy:
                 self.cleanup_build_files()
 
             if uploaded and not self.args.skip_git_push:
-                self.git_push(new_version=new_version, dry_run=self.config.dry_run)
+                self.git_push(
+                    project_dir=self.config.project_dir,
+                    new_version=new_version,
+                    dry_run=self.config.dry_run,
+                )
             else:
-                self.git_roll_back()
+                self.git_roll_back(self.config.project_dir)
             logger.info('Deploy completed')
+            return uploaded
         except Exception as e:
             logger.error(f"Deployment failed, rolling back: {e}", exc_info=True)
-            self.git_roll_back()
+            self.git_roll_back(self.config.project_dir)
             return False
 
     def get_twine_upload_info(self):
@@ -403,7 +408,7 @@ class PackageDeploy:
             raise IOError(f"Git repo is NOT clean: \n{result.stdout}")
 
     @staticmethod
-    def git_push(new_version: str, dry_run: bool = False):
+    def git_push(project_dir: Path, new_version: str, dry_run: bool = False):
         try:
             if dry_run:
                 logger.info("DRY RUN: Would run: git add .")
@@ -413,19 +418,19 @@ class PackageDeploy:
                 logger.info("DRY RUN: Would run: git push --follow-tags")
                 logger.info('DRY RUN: Git push simulation completed')
             else:
-                subprocess.check_output(['git', 'add', '.'], stderr=subprocess.STDOUT)
-                subprocess.check_output(['git', 'commit', '-m', f'Bump version to {new_version}'], stderr=subprocess.STDOUT)
+                subprocess.check_output(['git', 'add', '.'], stderr=subprocess.STDOUT, cwd=project_dir)
+                subprocess.check_output(['git', 'commit', '-m', f'Bump version to {new_version}'], stderr=subprocess.STDOUT, cwd=project_dir)
                 tag_name = f"v{new_version}"
-                
+
                 # Check if the tag already exists
-                result = subprocess.run(['git', 'tag', '-l', tag_name], capture_output=True, text=True)
+                result = subprocess.run(['git', 'tag', '-l', tag_name], capture_output=True, text=True, cwd=project_dir)
                 if result.stdout.strip():
                     logger.warning(f"Warning: Git tag {tag_name} already exists, skipping tag creation")
                 else:
-                    subprocess.check_output(['git', 'tag', '-a', tag_name, '-m', f'Release {tag_name}'], stderr=subprocess.STDOUT)
+                    subprocess.check_output(['git', 'tag', '-a', tag_name, '-m', f'Release {tag_name}'], stderr=subprocess.STDOUT, cwd=project_dir)
                     logger.info(f"Created Git tag: {tag_name}")
 
-                subprocess.check_output(['git', 'push', '--follow-tags'], stderr=subprocess.STDOUT)
+                subprocess.check_output(['git', 'push', '--follow-tags'], stderr=subprocess.STDOUT, cwd=project_dir)
                 logger.info('Pushing to github')
         except subprocess.CalledProcessError as ex:
             logger.error(f"Git command failed: {ex.output.decode()}")
@@ -437,11 +442,11 @@ class PackageDeploy:
             raise
 
     @staticmethod
-    def git_roll_back():
+    def git_roll_back(project_dir: Path):
         try:
-            subprocess.check_output(['git', 'restore', '.'], stderr=subprocess.STDOUT)
-            subprocess.check_output(['git', 'restore', '--staged', '.'], stderr=subprocess.STDOUT)
-            subprocess.check_output(['git', 'clean', '-fd'], stderr=subprocess.STDOUT)
+            subprocess.check_output(['git', 'restore', '.'], stderr=subprocess.STDOUT, cwd=project_dir)
+            subprocess.check_output(['git', 'restore', '--staged', '.'], stderr=subprocess.STDOUT, cwd=project_dir)
+            subprocess.check_output(['git', 'clean', '-fd'], stderr=subprocess.STDOUT, cwd=project_dir)
             logger.info('Restored changes')
         except subprocess.CalledProcessError as ex:
             logger.error(f"Git command failed: {ex.output.decode()}")
@@ -455,7 +460,7 @@ class PackageDeploy:
 
 
 def main():
-    PackageDeploy().deploy()
+    sys.exit(0 if PackageDeploy().deploy() else 1)
 
 
 if __name__ == "__main__":
