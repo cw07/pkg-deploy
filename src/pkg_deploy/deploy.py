@@ -206,9 +206,11 @@ class PackageDeploy:
             else:
                 build_strategy = StandardBuildStrategy()
 
+            built = False
             uploaded = False
             try:
-                if build_strategy.build(self.config, self.version_manager.toml_config):
+                built = build_strategy.build(self.config, self.version_manager.toml_config)
+                if built:
                     dist_dir = self.config.project_dir / "dist"
                     if self.config.use_cython:
                         self.check_wheel_no_source_leak(dist_dir)
@@ -225,11 +227,18 @@ class PackageDeploy:
                 )
             else:
                 self.git_roll_back(self.config.project_dir)
-            logger.info('Deploy completed')
+
+            if uploaded:
+                logger.info("Build complete successfully")
+            elif not built:
+                logger.error("Build failed")
+            else:
+                logger.error("Upload failed")
             return uploaded
         except Exception as e:
             logger.error(f"Deployment failed, rolling back: {e}", exc_info=True)
             self.git_roll_back(self.config.project_dir)
+            logger.error(f"Deploy failed: {e}")
             return False
 
     def get_twine_upload_info(self):
