@@ -105,9 +105,12 @@ def parse_args(args):
     )
 
     parser.add_argument(
-        "--skip-git-push",
+        "--discard-version-bump",
         action="store_true",
-        help="Don't push version changes and new tag to Git repository after build"
+        help="Leave the repository untouched: no bump commit, no tag, no push, and the version "
+             "bump written to pyproject.toml is reverted after a successful upload. The published "
+             "version therefore is not recorded anywhere in the repo, so the next deploy resolves "
+             "to that same version again - pass --new-version to avoid the upload clashing."
     )
 
     parser.add_argument(
@@ -190,6 +193,8 @@ class PackageDeploy:
         if not self.args.skip_git_status_check:
             self.check_git_status()
             
+        built = False
+        uploaded = False
         try:
             new_version = self.version_manager.bump_version(
                 version_type=self.config.version_type,
@@ -206,8 +211,6 @@ class PackageDeploy:
             else:
                 build_strategy = StandardBuildStrategy()
 
-            built = False
-            uploaded = False
             try:
                 built = build_strategy.build(self.config, self.version_manager.toml_config)
                 if built:
@@ -219,23 +222,55 @@ class PackageDeploy:
             finally:
                 self.cleanup_build_files()
 
-            if uploaded and not self.args.skip_git_push:
+            # Nothing was published: safe to undo the version bump and start over.
+            if not uploaded:
+                self.git_roll_back(self.config.project_dir)
+                logger.error("Deploy failed: build failed" if not built else "Deploy failed: upload failed")
+                return False
+
+            # Past this point the package is on the index. Re-running deploy would bump
+            # and publish a second version, so the working tree is only ever restored
+            # below when the caller explicitly asked for it.
+            logger.info(f"Deploy succeeded: {self.config.package_name} {new_version} uploaded")
+
+            if self.args.discard_version_bump:
+                # Requested behaviour: leave no trace of the release in the repository -
+                # no bump commit, no tag, and the version bump itself is reverted.
+                self.git_roll_back(self.config.project_dir)
+                logger.warning(
+                    f"--discard-version-bump: reverted the version bump, {self.config.pyproject_path.name} "
+                    f"is back at its previous version even though {new_version} was published. "
+                    f"The next deploy will resolve to {new_version} again and fail to upload unless "
+                    f"you pass --new-version explicitly."
+                )
+                return True
+
+            try:
                 self.git_push(
                     project_dir=self.config.project_dir,
                     new_version=new_version,
                     dry_run=self.config.dry_run,
                 )
-            else:
-                self.git_roll_back(self.config.project_dir)
+            except Exception as ex:
+                logger.error(
+                    f"Deploy SUCCEEDED, but updating git FAILED: {ex}\n"
+                    f"  {self.config.package_name} {new_version} is already published - do NOT re-run "
+                    f"deploy, it would bump the version and upload again.\n"
+                    f"  The bump commit and tag v{new_version} exist locally only. Push them manually:\n"
+                    f"      cd {self.config.project_dir} && git pull --rebase && git push --follow-tags"
+                )
+                return True
 
-            if uploaded:
-                logger.info("Build complete successfully")
-            elif not built:
-                logger.error("Build failed")
-            else:
-                logger.error("Upload failed")
-            return uploaded
+            logger.info("Deploy completed")
+            return True
         except Exception as e:
+            if uploaded:
+                logger.error(
+                    f"{self.config.package_name} {new_version} WAS published, but a later step failed: "
+                    f"{e}. Skipping rollback - fix the repository manually.",
+                    exc_info=True
+                )
+                return True
             logger.error(f"Deployment failed, rolling back: {e}", exc_info=True)
             self.git_roll_back(self.config.project_dir)
             logger.error(f"Deploy failed: {e}")

@@ -102,8 +102,13 @@ class CythonBuildStrategy(BuildStrategy):
             logger.error(f"Cython build error: {e}")
             return False
         finally:
-            if not config.dry_run:
-                self.restore_pyproject_toml(project_dir=config.project_dir, original_toml_config=toml_config)
+            # Always restore. prepare_pyproject_for_cython_build() rewrites pyproject.toml
+            # regardless of dry_run, so skipping this leaves the injected Cython build-system
+            # behind permanently. Restoring keeps the version bump: bump_version() mutates
+            # toml_config in place before the build runs, so this object already carries the
+            # new version and writing it back only drops the Cython scaffolding. Under
+            # dry_run bump_version() leaves it untouched, so the original version is kept.
+            self.restore_pyproject_toml(project_dir=config.project_dir, pre_cython_toml_config=toml_config)
 
     @staticmethod
     def _apply_unix_strip_flags(env: dict):
@@ -156,11 +161,18 @@ class CythonBuildStrategy(BuildStrategy):
             save_config(new_config, pyproject_path)
 
     @staticmethod
-    def restore_pyproject_toml(project_dir: Path, original_toml_config: TOMLDocument):
+    def restore_pyproject_toml(project_dir: Path, pre_cython_toml_config: TOMLDocument):
+        """Undo what prepare_pyproject_for_cython_build() wrote.
+
+        pre_cython_toml_config is the document as it stood when the Cython build
+        started - NOT the file's pre-deploy content. bump_version() mutates that same
+        document in place beforehand, so it already carries the new version and writing
+        it back keeps the bump while dropping the injected Cython build-system.
+        """
         pyproject_path = project_dir / "pyproject.toml"
-        if original_toml_config:
-            save_config(original_toml_config, pyproject_path)
-            logger.info("Restored original pyproject.toml")
+        if pre_cython_toml_config:
+            save_config(pre_cython_toml_config, pyproject_path)
+            logger.info("Restored pyproject.toml to its pre-Cython build-system")
 
     @staticmethod
     def create_setup_py_for_cython(config: DeployConfig, toml_config: TOMLDocument):

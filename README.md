@@ -247,8 +247,8 @@ pkg-deploy --project-dir /path/to/project --repository-name pypi
 # Custom package directory
 pkg-deploy --package-dir /path/to/package --repository-name pypi
 
-# Skip Git operations
-pkg-deploy --repository-name pypi --skip-git-push
+# Publish without recording the release in Git (version bump is reverted)
+pkg-deploy --repository-name pypi --new-version 1.2.3 --discard-version-bump
 
 # Verbose logging
 pkg-deploy --repository-name pypi --verbose
@@ -271,7 +271,7 @@ pkg-deploy --repository-name pypi --dry-run --verbose
 - `--repository-url, -rl`: Repository upload URL (prompts for username/password if not in .pypirc)
 - `--username, -u`: Authentication username (optional if configured in .pypirc)
 - `--password, -p`: Authentication password/token (optional if configured in .pypirc)
-- `--skip-git-push`: Skip pushing version changes and tags to Git repository
+- `--discard-version-bump`: Leave the repository untouched — no bump commit, no tag, no push, and the version bump written to `pyproject.toml` is reverted after a successful upload. The published version is then recorded nowhere in the repo, so the next deploy resolves to that same version again and the upload clashes; pair it with `--new-version`. (Replaces the old `--skip-git-push`.)
 - `--skip-git-status-check`: Skip Git status validation before deployment
 - `--dry-run`: Simulate deployment without making actual changes
 - `--verbose, -V`: Enable detailed logging output
@@ -306,7 +306,7 @@ For PyPI, use API tokens instead of passwords:
 ```
 Error: Git repo is NOT clean
 ```
-Solution: Commit or stash your changes before deployment or use `--skip-git-push`.
+Solution: Commit or stash your changes before deployment, or use `--skip-git-status-check`.
 
 **Missing Dependencies**
 ```
