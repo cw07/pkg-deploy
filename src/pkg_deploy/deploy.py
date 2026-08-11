@@ -82,10 +82,8 @@ def parse_args(args):
         "--minify", "-m",
         dest="minify",
         action="store_true",
-        help="Cython builds only (requires --cython): run the sources through python-minifier "
-             "before cythonize() reads them, and strip symbol tables from the compiled "
-             "extensions on Linux/macOS. Sources are restored immediately afterwards, so the "
-             "working tree is left untouched."
+        help="Minify the code before compilation to reduce its size. Must be used together "
+             "with --cython."
     )
 
     parser.add_argument(

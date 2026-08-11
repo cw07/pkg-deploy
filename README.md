@@ -10,7 +10,7 @@ Modern Python Package Deployment Tool
 
 - **Automatic Version Management**: Support for semantic versioning with patch, minor, major, alpha, beta, and release candidate bumps
 - **Flexible Build System**: Standard Python builds and optimized Cython compilation
-- **Source Minification**: Optional python-minifier pass plus symbol stripping for Cython builds
+- **Code Minification**: Optionally shrink the code before Cython compilation
 - **Source Leak Check**: Cython wheels are rejected before upload if any `.py` or intermediate C source slipped in
 - **Multiple Repository Support**: Deploy to PyPI, private Nexus repositories, and custom package indexes
 - **Git Integration**: Automatic tagging and commit management
@@ -185,7 +185,7 @@ pkg-deploy --repository-name pypi --version-type patch --cython
 pkg-deploy --repository-url https://nexus.example.com/repository/pypi-internal/ \
            --username user_name --password secret --cython
 
-# Cython build with source minification and symbol stripping
+# Cython build with code minification
 pkg-deploy --repository-name pypi --version-type patch --cython --minify
 ```
 
@@ -208,43 +208,6 @@ the restore; only the injected build-system entries are removed.
 The Cython version actually used comes from your `[build-system].requires`. If you want a
 specific one, pin it there — the `setup_requires` line in the generated `setup.py` is a legacy
 field and does not control it.
-
-#### Minification (`--minify`, `-m`)
-
-Requires `--cython` — passing `--minify` on its own is rejected rather than silently ignored,
-because a non-Cython build ships your sources verbatim and you would otherwise publish readable
-code believing they were protected. It:
-
-- runs every module through [python-minifier](https://pypi.org/project/python-minifier/)
-  (local renaming, literal statements removed) just before `cythonize()` reads it, then restores
-  the original sources, so your working tree is left untouched
-- on Linux/macOS adds `-fvisibility=hidden` and `-s` / `-Wl,-x` so the compiled extensions carry
-  no C-level symbol table (no-op on Windows)
-- disables Cython's `annotation_typing`, because minified locals can legally reuse a name across
-  a comprehension and an annotated variable — Cython would otherwise enforce the annotation as a
-  C type and fail at runtime
-
-Python-visible names (`__name__`, `__qualname__`) are stored as data and cannot be hidden by
-any of this.
-
-#### Source leak check
-
-After a Cython build, and before anything is uploaded, every wheel is inspected. It must contain
-only compiled extensions (`.pyd`/`.so`) plus `__init__.py` files. If any other `.py`, or any
-`.c` / `.cpp` / `.cxx` / `.pyx` / `.pxd` / `.h` / `.hpp` / `.pdb`, is found, the deployment stops:
-
-```
-ValueError: Source leak detected in built wheel(s) - refusing to upload.
-```
-
-The message lists the offending paths. The most common cause is a **directory without an
-`__init__.py`**: Cython derives a module's full name by walking up through parent directories
-only as long as each one is a package, so a missing `__init__.py` truncates the name and the
-generated `setup.py` can no longer match the compiled extension against the module it should
-replace — leaving the plain `.py` in the wheel. Adding the missing `__init__.py` fixes it.
-
-Note that `__init__.py` files are deliberately never cythonized, so whatever they contain ships
-as readable source. Keep logic you care about out of them.
 
 ### Cross-Platform Multiple Version Builds with cibuildwheel
 
@@ -332,7 +295,7 @@ pkg-deploy --repository-name pypi --dry-run --verbose
 - `--version-type, -vt`: Version bump type: patch, minor, major, alpha, beta, or rc
 - `--new-version, -v`: Specify exact version number (overrides version-type). Must match `MAJOR.MINOR.PATCH` with an optional `aN` / `bN` / `rcN` suffix — `1.2`, `1.2.3.post1` and `1.2.3dev1` are rejected
 - `--cython, -c`: Enable Cython compilation for performance
-- `--minify, -m`: Cython builds only — minify sources before compilation and strip symbol tables on Linux/macOS. Requires `--cython`; passing it alone is rejected
+- `--minify, -m`: Minify the code before compilation to reduce its size. Must be used together with `--cython`
 - `--cibuildwheel`: Use cibuildwheel for cross-platform wheel building (requires Docker on Linux)
 - `--repository-name, -rn`: Repository name from .pypirc configuration (e.g., 'pypi', 'testpypi')
 - `--repository-url, -ru`: Repository upload URL (prompts for username/password if not in .pypirc)
@@ -403,7 +366,7 @@ as-is, or migrate its configuration to `pyproject.toml`. See
 ValueError: Source leak detected in built wheel(s) - refusing to upload.
 ```
 Solution: The listed files should have been compiled but were not. Check that every directory
-holding those modules has an `__init__.py`. See [Source leak check](#source-leak-check).
+holding those modules has an `__init__.py`.
 
 **Contradictory Package Directory**
 ```
