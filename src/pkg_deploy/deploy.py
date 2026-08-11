@@ -79,9 +79,13 @@ def parse_args(args):
     )
 
     parser.add_argument(
-        "-m",
+        "--minify", "-m",
         dest="minify",
-        action="store_true"
+        action="store_true",
+        help="Cython builds only (requires --cython): run the sources through python-minifier "
+             "before cythonize() reads them, and strip symbol tables from the compiled "
+             "extensions on Linux/macOS. Sources are restored immediately afterwards, so the "
+             "working tree is left untouched."
     )
 
     parser.add_argument(
@@ -134,6 +138,11 @@ def parse_args(args):
     args = parser.parse_args(args)
     if not args.repository_url and not args.repository_name:
         parser.error("Either --repository-url or --repository-name must be provided.")
+    # Silently ignoring --minify would be dangerous: it exists to protect the sources, but a
+    # non-Cython build ships them verbatim, so the user would publish readable code believing
+    # otherwise.
+    if args.minify and not args.cython:
+        parser.error("--minify/-m only applies to Cython builds. Add --cython/-c, or drop --minify.")
     return args
 
 
@@ -151,9 +160,10 @@ class PackageDeploy:
 
         self.check_require_package(self.args.cython)
 
-        url, username, password = self.get_twine_upload_info()
         toml_config = load_config(pyproject_path)
         package_dir = self.resolve_package_dir(toml_config)
+
+        url, username, password = self.get_twine_upload_info()
 
         self.version_manager = VersionManager(pyproject_path, toml_config)
         self.config = DeployConfig(
@@ -368,7 +378,12 @@ class PackageDeploy:
                     logger.warning("'tool.setuptools.package-dir' values should be strings; skipping.")
 
             if len(set(pkg_dir_candidates)) > 1:
-                logger.warning(f"Package directory from toml are not the same: {pkg_dir_candidates}, use the default directory: {package_dir}")
+                raise ValueError(
+                    f"Package directory from toml are not the same: {pkg_dir_candidates}. "
+                    f"'tool.setuptools.packages.find.where' and 'tool.setuptools.package-dir' "
+                    f"must point at the same directory. Fix {self.args.project_dir / 'pyproject.toml'}, "
+                    f"or pass --package-dir to override both."
+                )
             elif len(pkg_dir_candidates) == 0:
                 logger.warning(f"No entry point find, use the default directory: {package_dir}")
             else:

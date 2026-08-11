@@ -10,10 +10,12 @@ Modern Python Package Deployment Tool
 
 - **Automatic Version Management**: Support for semantic versioning with patch, minor, major, alpha, beta, and release candidate bumps
 - **Flexible Build System**: Standard Python builds and optimized Cython compilation
+- **Source Minification**: Optional python-minifier pass plus symbol stripping for Cython builds
+- **Source Leak Check**: Cython wheels are rejected before upload if any `.py` or intermediate C source slipped in
 - **Multiple Repository Support**: Deploy to PyPI, private Nexus repositories, and custom package indexes
 - **Git Integration**: Automatic tagging and commit management
 - **Environment Detection**: Native support for both pip and uv virtual environments
-- **Dry Run Mode**: Test deployments without making actual changes
+- **Dry Run Mode**: Build the wheel without publishing it, bumping the version, or touching Git
 - **Interactive Authentication**: Secure credential input with API token support
 - **Automatic Cleanup**: Clean removal of build artifacts after deployment
 
@@ -60,6 +62,10 @@ pkg-deploy --repository-name pypi --version-type patch --dry-run
 ## Configuration
 
 ### pyproject.toml
+
+`pyproject.toml` is **required**. `pkg-deploy` refuses to start without one, and it must declare
+`[project].name` and `[project].version` — the version is read from and written back to this file
+only, so a `setup.py` cannot stand in for it.
 
 Ensure your `pyproject.toml` includes the required project metadata:
 
@@ -178,7 +184,67 @@ pkg-deploy --repository-name pypi --version-type patch --cython
 # Cython build for private repository
 pkg-deploy --repository-url https://nexus.example.com/repository/pypi-internal/ \
            --username user_name --password secret --cython
+
+# Cython build with source minification and symbol stripping
+pkg-deploy --repository-name pypi --version-type patch --cython --minify
 ```
+
+#### How `setup.py` is handled
+
+A Cython build needs a `setup.py`. `pkg-deploy` decides what to do based on what it finds in
+the project directory:
+
+| Situation | Behaviour |
+|---|---|
+| No `setup.py` | One is generated for the build and deleted again during cleanup |
+| `setup.py` exists and contains `cythonize` | Yours is used as-is and never overwritten |
+| `setup.py` exists without `cythonize` | The build stops with `FileExistsError` — back it up or migrate it to `pyproject.toml` |
+
+`pkg-deploy` also rewrites `[build-system]` in `pyproject.toml` for the duration of the build
+(adding `setuptools`/`Cython` to `requires` and forcing `build-backend` to
+`setuptools.build_meta`), then restores it afterwards. Any version bump you asked for survives
+the restore; only the injected build-system entries are removed.
+
+The Cython version actually used comes from your `[build-system].requires`. If you want a
+specific one, pin it there — the `setup_requires` line in the generated `setup.py` is a legacy
+field and does not control it.
+
+#### Minification (`--minify`, `-m`)
+
+Requires `--cython` — passing `--minify` on its own is rejected rather than silently ignored,
+because a non-Cython build ships your sources verbatim and you would otherwise publish readable
+code believing they were protected. It:
+
+- runs every module through [python-minifier](https://pypi.org/project/python-minifier/)
+  (local renaming, literal statements removed) just before `cythonize()` reads it, then restores
+  the original sources, so your working tree is left untouched
+- on Linux/macOS adds `-fvisibility=hidden` and `-s` / `-Wl,-x` so the compiled extensions carry
+  no C-level symbol table (no-op on Windows)
+- disables Cython's `annotation_typing`, because minified locals can legally reuse a name across
+  a comprehension and an annotated variable — Cython would otherwise enforce the annotation as a
+  C type and fail at runtime
+
+Python-visible names (`__name__`, `__qualname__`) are stored as data and cannot be hidden by
+any of this.
+
+#### Source leak check
+
+After a Cython build, and before anything is uploaded, every wheel is inspected. It must contain
+only compiled extensions (`.pyd`/`.so`) plus `__init__.py` files. If any other `.py`, or any
+`.c` / `.cpp` / `.cxx` / `.pyx` / `.pxd` / `.h` / `.hpp` / `.pdb`, is found, the deployment stops:
+
+```
+ValueError: Source leak detected in built wheel(s) - refusing to upload.
+```
+
+The message lists the offending paths. The most common cause is a **directory without an
+`__init__.py`**: Cython derives a module's full name by walking up through parent directories
+only as long as each one is a package, so a missing `__init__.py` truncates the name and the
+generated `setup.py` can no longer match the compiled extension against the module it should
+replace — leaving the plain `.py` in the wheel. Adding the missing `__init__.py` fixes it.
+
+Note that `__init__.py` files are deliberately never cythonized, so whatever they contain ships
+as readable source. Keep logic you care about out of them.
 
 ### Cross-Platform Multiple Version Builds with cibuildwheel
 
@@ -264,24 +330,32 @@ pkg-deploy --repository-name pypi --dry-run --verbose
 - `--project-dir`: Project directory (default: current directory)
 - `--package-dir`: Package directory path (default: auto-resolved from pyproject.toml or project name)
 - `--version-type, -vt`: Version bump type: patch, minor, major, alpha, beta, or rc
-- `--new-version, -v`: Specify exact version number (overrides version-type)
+- `--new-version, -v`: Specify exact version number (overrides version-type). Must match `MAJOR.MINOR.PATCH` with an optional `aN` / `bN` / `rcN` suffix — `1.2`, `1.2.3.post1` and `1.2.3dev1` are rejected
 - `--cython, -c`: Enable Cython compilation for performance
+- `--minify, -m`: Cython builds only — minify sources before compilation and strip symbol tables on Linux/macOS. Requires `--cython`; passing it alone is rejected
 - `--cibuildwheel`: Use cibuildwheel for cross-platform wheel building (requires Docker on Linux)
 - `--repository-name, -rn`: Repository name from .pypirc configuration (e.g., 'pypi', 'testpypi')
-- `--repository-url, -rl`: Repository upload URL (prompts for username/password if not in .pypirc)
+- `--repository-url, -ru`: Repository upload URL (prompts for username/password if not in .pypirc)
 - `--username, -u`: Authentication username (optional if configured in .pypirc)
 - `--password, -p`: Authentication password/token (optional if configured in .pypirc)
-- `--discard-version-bump`: Leave the repository untouched — no bump commit, no tag, no push, and the version bump written to `pyproject.toml` is reverted after a successful upload. The published version is then recorded nowhere in the repo, so the next deploy resolves to that same version again and the upload clashes; pair it with `--new-version`. (Replaces the old `--skip-git-push`.)
+- `--discard-version-bump`: Leave the repository untouched — no bump commit, no tag, no push, and the version bump written to `pyproject.toml` is reverted after a successful upload. The published version is then recorded nowhere in the repo, so the next deploy resolves to that same version again and the upload clashes; pair it with `--new-version`
 - `--skip-git-status-check`: Skip Git status validation before deployment
-- `--dry-run`: Simulate deployment without making actual changes
+- `--dry-run`: Build the wheel and log what would be uploaded, without publishing it, bumping the version, or touching Git. The build itself really runs, so `dist/` and `build/` are created and then cleaned up
 - `--verbose, -V`: Enable detailed logging output
 
 ## Environment Support
 
 ### UV Virtual Environments
 
-`pkg-deploy` automatically detects and supports UV-managed virtual environments:
+`pkg-deploy` detects a uv-managed environment by looking for a `uv = ...` marker in the
+`pyvenv.cfg` of the active interpreter. When it finds one it builds with `uv build --wheel`
+(installing `uv` first if it is missing); otherwise it falls back to `python -m build --wheel`.
+Passing `--cibuildwheel` overrides both and runs `cibuildwheel` instead.
 
+Either way the build runs in an isolated environment that installs your
+`[build-system].requires` fresh, so that is where build-time pins such as `Cython>=3.2` take
+effect. Note that uv caches resolutions — run `uv cache clean` if you need to be certain you
+picked up the newest matching release.
 
 ## Security Considerations
 
@@ -296,7 +370,8 @@ For PyPI, use API tokens instead of passwords:
 ### Credential Storage
 
 - Store credentials in `.pypirc` for reusability
-- Enable interactive mode for secure input
+- Leave `--username` / `--password` off the command line and let `pkg-deploy` prompt for them
+  instead — the prompt uses `getpass`, so nothing is echoed or kept in your shell history
 
 ## Troubleshooting
 
@@ -312,31 +387,49 @@ Solution: Commit or stash your changes before deployment, or use `--skip-git-sta
 ```
 Error: Missing required packages: build, twine
 ```
-Solution: Install missing packages with `pip install build twine`.
+Solution: Install the missing packages. `build`, `twine`, `toml` and `tomlkit` are always
+required; `--cython` additionally requires `Cython`.
 
 **Cython Build Conflicts**
 ```
 Error: Cannot build Cython code: setup.py already exists
 ```
-Solution: Backup existing `setup.py` or migrate configuration to `pyproject.toml`.
+Solution: Back up the existing `setup.py`, add a `cythonize` call to it so `pkg-deploy` uses it
+as-is, or migrate its configuration to `pyproject.toml`. See
+[How `setup.py` is handled](#how-setuppy-is-handled).
 
-**Docker Not Available (Linux)**
+**Source Leak Detected**
 ```
-Error: Docker is required for cibuildwheel on Linux
+ValueError: Source leak detected in built wheel(s) - refusing to upload.
 ```
-Solution: Install and start Docker service, or use `--cython` without `--cibuildwheel` for local builds only.
+Solution: The listed files should have been compiled but were not. Check that every directory
+holding those modules has an `__init__.py`. See [Source leak check](#source-leak-check).
 
-**cibuildwheel Build Failures**
+**Contradictory Package Directory**
 ```
-Error: cibuildwheel build failed
+ValueError: Package directory from toml are not the same: ['src', 'lib']
 ```
-Solution: Check Docker is running (Linux), verify `pyproject.toml` cibuildwheel configuration, and ensure sufficient disk space.
+Solution: Make `tool.setuptools.packages.find.where` and `tool.setuptools.package-dir` point at
+the same directory, or pass `--package-dir` to override both.
+
+**Build Failures**
+```
+ValueError: Cython build failed,
+stdout: ...
+stderr: ...
+```
+Solution: `pkg-deploy` reports the underlying build tool's output verbatim — read the `stderr`
+section first. For `--cibuildwheel` on Linux, check that Docker is installed and running,
+verify your `[tool.cibuildwheel]` configuration, and make sure there is enough disk space.
+`pkg-deploy` itself does not check for Docker, so a missing daemon surfaces as a cibuildwheel
+error inside this output.
 
 **Authentication Failures**
 ```
 Error: 403 Forbidden
 ```
-Solution: Verify credentials, use API tokens for PyPI, or enable interactive mode.
+Solution: Verify credentials, or use API tokens for PyPI. Omitting `--username` / `--password`
+makes `pkg-deploy` prompt for them interactively.
 
 ### Debug Mode
 
@@ -347,7 +440,5 @@ pkg-deploy --repository-name pypi --verbose --dry-run
 ```
 
 ---
-
-Noticed that the `clibuildwheel` needs docker service in Linux to build different version
 
 **pkg-deploy** - Streamlining Python package deployment since 2025.
