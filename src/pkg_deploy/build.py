@@ -224,6 +224,15 @@ class CythonBuildStrategy(BuildStrategy):
         else:
             entry_points = []
 
+        # Both dependency tables are rendered through repr() of PLAIN Python
+        # objects (tomlkit's .unwrap()), not str() of tomlkit's Array/Table.
+        # The two happen to print alike today, but only repr() of a list/dict
+        # is guaranteed to be a Python literal that setup.py can execute.
+        dependencies = toml_config["project"].get("dependencies")
+        install_requires = dependencies.unwrap() if dependencies else []
+        optional = toml_config["project"].get("optional-dependencies")
+        extras_require = optional.unwrap() if optional else {}
+
         # Build the ext_modules construction. Generated C sources go under build/cython
         # so include_package_data cannot copy them into the wheel. When minification is
         # enabled, Python sources are restored immediately after cythonize() reads them.
@@ -317,7 +326,8 @@ class CythonBuildStrategy(BuildStrategy):
             {f"author_email='{author_emails}'," if author_emails else ""}
             {f"description='{toml_config['project']['description']}'," if toml_config["project"].get("description", "") else ""}
             {f"python_requires='{toml_config['project']['requires-python']}'," if toml_config["project"].get("requires-python") else ""}
-            {f"install_requires={toml_config['project']['dependencies']}," if toml_config["project"].get("dependencies") and len(toml_config["project"]["dependencies"]) > 0 else ""}
+            {f"install_requires={install_requires!r}," if install_requires else ""}
+            {f"extras_require={extras_require!r}," if extras_require else ""}
             entry_points={{
                 'console_scripts': {entry_points}
             }},
