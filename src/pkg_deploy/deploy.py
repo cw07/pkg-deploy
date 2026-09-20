@@ -134,7 +134,15 @@ def parse_args(args):
         "--dry-run",
         action="store_true",
         help="Build the wheel and log what would be uploaded, but do not publish, bump the "
-             "version, or touch git. dist/ and build/ are still created and cleaned up"
+             "version, or touch git. dist/ and build/ are still created and cleaned up "
+             "(add --keep-dist to inspect the wheel)"
+    )
+
+    parser.add_argument(
+        "--keep-dist",
+        action="store_true",
+        help="Leave dist/ in place after the run instead of deleting it, so the built wheel can "
+             "be inspected or reused. dist/ is always emptied before the next build"
     )
 
     parser.add_argument(
@@ -188,7 +196,8 @@ class PackageDeploy:
             repository_url=url,
             username=username,
             password=password,
-            dry_run=self.args.dry_run
+            dry_run=self.args.dry_run,
+            keep_dist=self.args.keep_dist,
         )
         self.setup_file_exist = (self.config.project_dir / "setup.py").exists()
 
@@ -243,7 +252,7 @@ class PackageDeploy:
 
             # Nothing was published: safe to undo the version bump and start over.
             if not uploaded:
-                self.git_roll_back(self.config.project_dir)
+                self.git_roll_back(self.config.project_dir, self.version_manager.touched_files)
                 logger.error("Deploy failed: build failed" if not built else "Deploy failed: upload failed")
                 return False
 
@@ -255,7 +264,7 @@ class PackageDeploy:
             if self.args.discard_version_bump:
                 # Requested behaviour: leave no trace of the release in the repository -
                 # no bump commit, no tag, and the version bump itself is reverted.
-                self.git_roll_back(self.config.project_dir)
+                self.git_roll_back(self.config.project_dir, self.version_manager.touched_files)
                 logger.warning(
                     f"--discard-version-bump: reverted the version bump, {self.config.pyproject_path.name} "
                     f"is back at its previous version even though {new_version} was published. "
@@ -268,6 +277,7 @@ class PackageDeploy:
                 self.git_push(
                     project_dir=self.config.project_dir,
                     new_version=new_version,
+                    files=self.version_manager.touched_files,
                     dry_run=self.config.dry_run,
                 )
             except Exception as ex:
@@ -291,7 +301,7 @@ class PackageDeploy:
                 )
                 return True
             logger.error(f"Deployment failed, rolling back: {e}", exc_info=True)
-            self.git_roll_back(self.config.project_dir)
+            self.git_roll_back(self.config.project_dir, self.version_manager.touched_files)
             logger.error(f"Deploy failed: {e}")
             return False
 
@@ -470,7 +480,10 @@ class PackageDeploy:
         egg_root = project_dir / self.config.source_root
         # Cython intermediates are generated under build/cython. Never recursively
         # remove *.c from the package tree because projects may own those sources.
-        shutil.rmtree(project_dir / 'dist', ignore_errors=True)
+        if self.config.keep_dist:
+            logger.info(f"--keep-dist: leaving {project_dir / 'dist'} in place")
+        else:
+            shutil.rmtree(project_dir / 'dist', ignore_errors=True)
         shutil.rmtree(project_dir / 'build', ignore_errors=True)
         shutil.rmtree(egg_root / f'{self.config.package_name}.egg-info', ignore_errors=True)
         egg_info_name = self.config.package_name.replace("-", "_")
@@ -492,17 +505,18 @@ class PackageDeploy:
             raise IOError(f"Git repo is NOT clean: \n{result.stdout}")
 
     @staticmethod
-    def git_push(project_dir: Path, new_version: str, dry_run: bool = False):
+    def git_push(project_dir: Path, new_version: str, files: list, dry_run: bool = False):
+        paths = [str(f) for f in files]
         try:
             if dry_run:
-                logger.info("DRY RUN: Would run: git add .")
+                logger.info(f"DRY RUN: Would run: git add -- {' '.join(paths)}")
                 logger.info(f"DRY RUN: Would run: git commit -m 'Bump version to {new_version}'")
                 tag_name = f"v{new_version}"
                 logger.info(f"DRY RUN: Would create Git tag: {tag_name}")
                 logger.info("DRY RUN: Would run: git push --follow-tags")
                 logger.info('DRY RUN: Git push simulation completed')
             else:
-                subprocess.check_output(['git', 'add', '.'], stderr=subprocess.STDOUT, cwd=project_dir)
+                subprocess.check_output(['git', 'add', '--', *paths], stderr=subprocess.STDOUT, cwd=project_dir)
                 subprocess.check_output(['git', 'commit', '-m', f'Bump version to {new_version}'], stderr=subprocess.STDOUT, cwd=project_dir)
                 tag_name = f"v{new_version}"
 
@@ -526,12 +540,15 @@ class PackageDeploy:
             raise
 
     @staticmethod
-    def git_roll_back(project_dir: Path):
+    def git_roll_back(project_dir: Path, files: list):
+        """Revert the version bump: only the files bump_version() wrote are touched."""
+        if not files:
+            return
+        paths = [str(f) for f in files]
         try:
-            subprocess.check_output(['git', 'restore', '.'], stderr=subprocess.STDOUT, cwd=project_dir)
-            subprocess.check_output(['git', 'restore', '--staged', '.'], stderr=subprocess.STDOUT, cwd=project_dir)
-            subprocess.check_output(['git', 'clean', '-fd'], stderr=subprocess.STDOUT, cwd=project_dir)
-            logger.info('Restored changes')
+            subprocess.check_output(['git', 'restore', '--staged', '--worktree', '--', *paths],
+                                    stderr=subprocess.STDOUT, cwd=project_dir)
+            logger.info(f"Restored {', '.join(Path(p).name for p in paths)}")
         except subprocess.CalledProcessError as ex:
             logger.error(f"Git command failed: {ex.output.decode()}")
         except Exception as ex:

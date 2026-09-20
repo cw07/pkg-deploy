@@ -16,6 +16,9 @@ class VersionManager:
     def __init__(self, pyproject_path: Path, toml_config: TOMLDocument):
         self.pyproject_path = pyproject_path
         self.toml_config = toml_config
+        # Files the last bump_version() wrote (or, under dry_run, would have written).
+        # This is exactly the set git_push() stages and git_roll_back() restores.
+        self.touched_files = []
 
     def get_current_version(self) -> str:
         return str(self.toml_config['project']['version'])
@@ -75,59 +78,49 @@ class VersionManager:
         current_version = self.get_current_version()
         if new_version is None:
             new_version = self.resolve_new_version(current_version, version_type)
-        
+
+        self.touched_files = [self.pyproject_path]
         if not dry_run:
-            # Update pyproject.toml
             self.toml_config['project']['version'] = new_version
             save_config(self.toml_config, self.pyproject_path)
-            # Update files configured under [tool.bumpversion.file]
-            self.update_bumpversion_files(current_version, new_version)
+        self.touched_files += self.update_bumpversion_files(current_version, new_version, dry_run)
 
         logger.info(f"Version bumped from {current_version} to {new_version}")
         return new_version
 
-    def update_bumpversion_files(self, current_version: str, new_version: str) -> None:
-        """Update files configured in [tool.bumpversion.file] section."""
+    def update_bumpversion_files(self, current_version: str, new_version: str, dry_run: bool = False) -> list:
+        """Rewrite the files listed under [tool.bumpversion.file]; return their paths."""
         bumpversion_config = self.toml_config.get('tool', {}).get('bumpversion', {})
         files = bumpversion_config.get('file', [])
-
-        # If 'file' is a single dict, make it a list
         if isinstance(files, dict):
             files = [files]
 
+        touched = []
         for file_config in files:
             filename = file_config.get('filename')
+            if not filename:
+                logger.warning("Skipping bumpversion file entry with no 'filename'")
+                continue
             if filename == "pyproject.toml":
                 continue
             search = file_config.get('search', '{current_version}')
             replace = file_config.get('replace', '{new_version}')
 
-            if not filename:
-                logger.warning("Skipping bumpversion file entry with no 'filename'")
-                continue
-
-            file_path = Path(filename)
+            # Entries are relative to the project, not to wherever pkg-deploy was launched.
+            file_path = self.pyproject_path.parent / filename
             if not file_path.exists():
                 logger.warning(f"File {filename} not found, skipping.")
                 continue
 
-            # Read file content
             content = file_path.read_text(encoding='utf-8')
-
-            # Replace placeholders
             old_str = search.format(current_version=current_version)
             new_str = replace.format(new_version=new_version)
-
-            # Escape for literal string replacement (not regex)
             if old_str not in content:
                 logger.warning(f"Search pattern '{old_str}' not found in {filename}, skipping.")
                 continue
 
-            new_content = content.replace(old_str, new_str)
-
-            # Write back only if changed
-            if new_content != content:
-                file_path.write_text(new_content, encoding='utf-8')
-                logger.info(f"Updated {filename}: '{old_str}' → '{new_str}'")
-            else:
-                logger.debug(f"No changes needed in {filename}")
+            if not dry_run:
+                file_path.write_text(content.replace(old_str, new_str), encoding='utf-8')
+                logger.info(f"Updated {filename}: '{old_str}' -> '{new_str}'")
+            touched.append(file_path)
+        return touched

@@ -34,6 +34,7 @@ class DeployConfig:
     username: Optional[str] = None
     password: Optional[str] = None
     dry_run: bool = False
+    keep_dist: bool = False
 
 
 def resolve_source_root(project_dir: Path, package_dir: Path) -> str:

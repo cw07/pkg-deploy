@@ -321,6 +321,9 @@ pkg-deploy --repository-name pypi --verbose
 
 # Dry run with verbose output
 pkg-deploy --repository-name pypi --dry-run --verbose
+
+# Build, keep the wheel under dist/ for inspection, publish nothing
+pkg-deploy --repository-name pypi --dry-run --keep-dist
 ```
 
 ## Command Line Interface
@@ -340,7 +343,8 @@ pkg-deploy --repository-name pypi --dry-run --verbose
 - `--password, -p`: Authentication password/token (optional if configured in .pypirc)
 - `--discard-version-bump`: Leave the repository untouched — no bump commit, no tag, no push, and the version bump written to `pyproject.toml` is reverted after a successful upload. The published version is then recorded nowhere in the repo, so the next deploy resolves to that same version again and the upload clashes; pair it with `--new-version`
 - `--skip-git-status-check`: Skip Git status validation before deployment
-- `--dry-run`: Build the wheel and log what would be uploaded, without publishing it, bumping the version, or touching Git. The build itself really runs, so `dist/` and `build/` are created and then cleaned up
+- `--dry-run`: Build the wheel and log what would be uploaded, without publishing it, bumping the version, or touching Git. The build itself really runs, so `dist/` and `build/` are created and then cleaned up — add `--keep-dist` to look at the wheel
+- `--keep-dist`: Leave `dist/` in place after the run instead of deleting it, so the built wheel can be inspected or reused (e.g. attached to a release). `dist/` is always emptied before the next build, so a kept wheel is never uploaded twice. If your `.gitignore` does not cover `dist/`, the next run's clean-tree check will point at it
 - `--verbose, -V`: Debug logging, including the full output of the build tool (which packages the isolated build environment installed, which modules were cythonized, compiler warnings)
 
 ## Environment Support
