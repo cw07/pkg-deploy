@@ -5,7 +5,7 @@ import logging
 import textwrap
 import subprocess
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from tomlkit.toml_document import TOMLDocument
@@ -21,7 +21,6 @@ class DeployConfig:
     package_name: str
     project_dir: Path
     package_dir: Path
-    package_entry: str
     source_root: str
     pyproject_path: Path
     version_type: str
@@ -37,14 +36,13 @@ class DeployConfig:
     dry_run: bool = False
 
 
-def resolve_source_layout(project_dir: Path, package_dir: Path) -> Tuple[str, str]:
-    """Return (package_entry, source_root), both POSIX paths relative to project_dir.
+def resolve_source_root(project_dir: Path, package_dir: Path) -> str:
+    """The directory whose children are the top-level packages, as a POSIX path
+    relative to project_dir - what find_packages() and package_dir need.
 
-    package_entry is where the .py sources live - what cythonize() globs.
-    source_root is what find_packages() / package_dir need: the directory whose
-    children are the top-level packages. The two differ for a flat layout, where
-    package_dir IS the package (mypkg/ -> source_root '.') rather than a container
-    of packages (src/ -> source_root 'src').
+    A flat layout resolves package_dir to the package itself (mypkg/), so its
+    parent ('.') is the root; the src layout resolves to a container (src/),
+    which is the root as-is. Told apart by the presence of __init__.py.
     """
     try:
         rel = package_dir.resolve().relative_to(project_dir.resolve())
@@ -52,9 +50,7 @@ def resolve_source_layout(project_dir: Path, package_dir: Path) -> Tuple[str, st
         raise ValueError(
             f"Package directory {package_dir} must be inside the project directory {project_dir}"
         ) from None
-    package_entry = rel.as_posix()
-    source_root = rel.parent.as_posix() if (package_dir / "__init__.py").exists() else package_entry
-    return package_entry, source_root
+    return rel.parent.as_posix() if (package_dir / "__init__.py").exists() else rel.as_posix()
 
 
 class BuildStrategy(ABC):
@@ -328,7 +324,15 @@ class CythonBuildStrategy(BuildStrategy):
         from setuptools.dist import Distribution
         from setuptools.command.build_py import build_py as _build_py
     
-        py_files = glob.glob("{config.package_entry}/**/*.py", recursive=True)
+        # Only sources that belong to a discovered package are compiled. A bare glob over
+        # the source root would also sweep up tests/, conftest.py and this setup.py itself
+        # whenever the root is the project directory.
+        packages = find_packages(where="{config.source_root}")
+        py_files = [
+            f
+            for top in sorted({{p.split(".")[0] for p in packages}})
+            for f in glob.glob("{config.source_root}/" + top + "/**/*.py", recursive=True)
+        ]
         py_files = [f for f in py_files if not f.endswith("__init__.py")]
 
         {minify_section}
@@ -362,7 +366,7 @@ class CythonBuildStrategy(BuildStrategy):
             entry_points={{
                 'console_scripts': {entry_points}
             }},
-            packages=find_packages(where="{config.source_root}"),
+            packages=packages,
             package_dir={{"": "{config.source_root}"}},
             include_package_data=True,
             exclude_package_data={{

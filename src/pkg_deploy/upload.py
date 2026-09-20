@@ -19,9 +19,8 @@ class Upload(ABC):
         pass
 
 
-class NexusUpload(Upload):
-    """Upload with twine. Despite the name this serves any index - PyPI or a private
-    one such as Nexus - since twine speaks the same protocol to all of them."""
+class TwineUpload(Upload):
+    """Upload the wheels with twine; works for PyPI and private indexes alike."""
 
     @staticmethod
     def get_wheel_files(config: DeployConfig):

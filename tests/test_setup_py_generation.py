@@ -30,7 +30,6 @@ def _config(tmp_path: Path) -> DeployConfig:
         package_name="demo",
         project_dir=tmp_path,
         package_dir=tmp_path / "src" / "demo",
-        package_entry="src",
         source_root="src",
         pyproject_path=tmp_path / "pyproject.toml",
         version_type="patch",

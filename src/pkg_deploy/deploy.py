@@ -7,9 +7,9 @@ import subprocess
 from pathlib import Path
 from tomlkit import TOMLDocument
 
-from .upload import Upload, NexusUpload
+from .upload import Upload, TwineUpload
 from .version_managment import VersionManager
-from .build import DeployConfig, CythonBuildStrategy, StandardBuildStrategy, resolve_source_layout
+from .build import DeployConfig, CythonBuildStrategy, StandardBuildStrategy, resolve_source_root
 from .utils import get_pypirc_info, get_credentials, is_uv_venv, validate_version_arg, load_config
 
 
@@ -168,7 +168,7 @@ class PackageDeploy:
 
         toml_config = load_config(pyproject_path)
         package_dir = self.resolve_package_dir(toml_config)
-        package_entry, source_root = resolve_source_layout(self.args.project_dir, package_dir)
+        source_root = resolve_source_root(self.args.project_dir, package_dir)
 
         url, username, password = self.get_twine_upload_info()
 
@@ -177,7 +177,6 @@ class PackageDeploy:
             package_name=toml_config["project"]["name"],
             project_dir=self.args.project_dir,
             package_dir=package_dir,
-            package_entry=package_entry,
             source_root=source_root,
             pyproject_path=pyproject_path,
             version_type=self.args.version_type,
@@ -524,7 +523,7 @@ class PackageDeploy:
 
     @staticmethod
     def get_upload_strategy(config) -> Upload:
-        return NexusUpload()
+        return TwineUpload()
 
 
 def main():
