@@ -236,9 +236,14 @@ class PackageDeploy:
             else:
                 build_strategy = StandardBuildStrategy()
 
-            # get_wheel_files() uploads every wheel in dist/, so a leftover from an earlier
-            # run must not be there when the new one lands.
-            shutil.rmtree(self.config.project_dir / 'dist', ignore_errors=True)
+            # Stale dist/ would be uploaded alongside the new wheel (get_wheel_files() takes
+            # every wheel in it); stale build/lib is packaged as-is by setuptools, so modules
+            # deleted since the last run would reappear in the wheel.
+            for leftover in ('dist', 'build'):
+                path = self.config.project_dir / leftover
+                if path.is_dir() and any(path.iterdir()):
+                    logger.info(f"Removed leftover {leftover}/ from an earlier run before building")
+                shutil.rmtree(path, ignore_errors=True)
             try:
                 built = build_strategy.build(self.config, self.version_manager.toml_config)
                 if built:

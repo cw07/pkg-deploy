@@ -21,6 +21,13 @@ Modern Python Package Deployment Tool
 
 ## Installation
 
+### Requirements
+
+- Python 3.8 or newer
+- `git` 2.23 or newer on `PATH` (the rollback uses `git restore --staged --worktree`; on an older
+  git a failed run still stops correctly, but the version bump has to be reverted by hand)
+- Docker, only for `--cibuildwheel` on Linux
+
 ### From PyPI
 
 ```bash
