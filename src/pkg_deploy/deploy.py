@@ -153,9 +153,8 @@ def parse_args(args):
 
 
 class PackageDeploy:
-    def __init__(self):
-        args = sys.argv[1:]
-        self.args = parse_args(args)
+    def __init__(self, argv=None):
+        self.args = parse_args(sys.argv[1:] if argv is None else argv)
         if not (self.args.project_dir / "pyproject.toml").exists():
             raise ValueError(f"pyproject.toml not found under project directory: {self.args.project_dir}")
         else:
@@ -526,8 +525,8 @@ class PackageDeploy:
         return TwineUpload()
 
 
-def main():
-    sys.exit(0 if PackageDeploy().deploy() else 1)
+def main(argv=None):
+    sys.exit(0 if PackageDeploy(argv).deploy() else 1)
 
 
 if __name__ == "__main__":
