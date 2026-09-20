@@ -1,3 +1,4 @@
+import os
 import sys
 import shutil
 import zipfile
@@ -241,7 +242,7 @@ class PackageDeploy:
             # deleted since the last run would reappear in the wheel.
             for leftover in ('dist', 'build'):
                 path = self.config.project_dir / leftover
-                if path.is_dir() and any(path.iterdir()):
+                if path.is_dir() and self._has_entries(path):
                     logger.info(f"Removed leftover {leftover}/ from an earlier run before building")
                 shutil.rmtree(path, ignore_errors=True)
             try:
@@ -477,6 +478,12 @@ class PackageDeploy:
                 "Likely a module failed to cythonize or was excluded from the build."
             )
         logger.info(f"Wheel source-leak check passed for: {[w.name for w in wheels]}")
+
+    @staticmethod
+    def _has_entries(path: Path) -> bool:
+        # os.scandir stops at the first entry; Path.iterdir() reads the whole listing first.
+        with os.scandir(path) as it:
+            return next(it, None) is not None
 
     def cleanup_build_files(self):
         logger.info('Deleting build, dist and egg-info files after deployment')
