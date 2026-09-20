@@ -31,18 +31,24 @@ pip install pkg-deploy
 
 ### Basic Usage
 
-After installing pkg-deploy , navigate to your project directory (the folder containing your pyproject.toml ) and use the pkg-deploy command directly. 
-Example project structure:
+After installing pkg-deploy, navigate to your project directory (the folder containing your
+pyproject.toml) and use the pkg-deploy command directly. Both common layouts work:
 
 ```text
-my-package/
-├── src/
-│   └── my_package/
-│       ├── __init__.py
-│       └── main.py
-├── pyproject.toml
+src layout                          flat layout
+my-package/                         my-package/
+├── src/                            ├── my_package/
+│   └── my_package/                 │   ├── __init__.py
+│       ├── __init__.py             │   └── main.py
+│       └── main.py                 ├── pyproject.toml
+├── pyproject.toml                  └── README.md
 └── README.md
 ```
+
+With the src layout, point setuptools at it in pyproject.toml (`package-dir = {"" = "src"}` and
+`packages.find.where = ["src"]`, see [Configuration](#configuration)). With the flat layout no
+extra configuration is needed — the package directory is found by the project name
+(`my-package` → `my_package/`); if the package is named differently, pass `--package-dir`.
 
 #### Running the Deployment
 
