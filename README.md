@@ -25,6 +25,8 @@ Modern Python Package Deployment Tool
 
 ```bash
 pip install pkg-deploy
+# or, as a standalone tool managed by uv
+uv tool install pkg-deploy
 ```
 
 ## Quick Start
@@ -58,9 +60,8 @@ Use the `pkg-deploy` command with your desired arguments:
 # Deploy with patch version bump to PyPI
 pkg-deploy --repository-name pypi --version-type patch
 
-# Deploy to private repository with minor version bump
-pkg-deploy --repository-url https://nexus.example.com/repository/pypi-internal/ \
-           --username admin --password secret --version-type minor
+# Deploy to a private repository not listed in ~/.pypirc; credentials are prompted for
+pkg-deploy --repository-url https://nexus.example.com/repository/pypi-internal/ --version-type minor
 
 # Dry run to test configuration
 pkg-deploy --repository-name pypi --version-type patch --dry-run
@@ -77,7 +78,7 @@ Ensure your `pyproject.toml` includes the required project metadata:
 
 ```toml
 [build-system]
-requires = ["setuptools>=70"]
+requires = ["setuptools>=70"]          # add "Cython>=3.2" here to pin the Cython used by --cython
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -108,6 +109,9 @@ search = '__version__ = "{current_version}"'
 replace = '__version__ = "{new_version}"'
 ```
 
+For the flat layout, drop the two `[tool.setuptools*]` tables (setuptools finds the package on
+its own) and use `filename = "your_package/__init__.py"` in the bumpversion entry.
+
 ### Package Directory Resolution
 
 `pkg-deploy` automatically resolves the package directory using the following priority:
@@ -128,10 +132,17 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
-# Custom package location
+# Package under a nested container directory (custom/path/my_package/)
 [tool.setuptools]
-package-dir = {"my_package" = "custom/path"}
+package-dir = {"" = "custom/path"}
+
+[tool.setuptools.packages.find]
+where = ["custom/path"]
 ```
+
+Mapping a package *name* to a differently named directory (`package-dir = {"my_package" =
+"custom/path"}`) works for standard builds, where setuptools handles it, but not with `--cython`:
+the compiled module names are derived from the directory names and would not match.
 
 Both the `src` layout and the flat layout (package directly under the project root, no
 `src/`) are supported, including for Cython builds. `pkg-deploy` tells them apart by whether the
@@ -207,9 +218,8 @@ Rules for pre-releases:
 # Build with Cython optimization
 pkg-deploy --repository-name pypi --version-type patch --cython
 
-# Cython build for private repository
-pkg-deploy --repository-url https://nexus.example.com/repository/pypi-internal/ \
-           --username user_name --password secret --cython
+# Cython build for a private repository; credentials are prompted for
+pkg-deploy --repository-url https://nexus.example.com/repository/pypi-internal/ --cython
 
 # Cython build with code minification
 pkg-deploy --repository-name pypi --version-type patch --cython --minify
@@ -282,9 +292,8 @@ before-build = "pip install Cython"
 # Cython build for every configured Python version
 pkg-deploy --repository-name pypi --version-type patch --cython --cibuildwheel
 
-# Same, to a private repository
-pkg-deploy --repository-url https://nexus.example.com/repository/pypi-internal/ \
-           --username admin --password secret --cython --cibuildwheel
+# Same, to a private repository; credentials are prompted for
+pkg-deploy --repository-url https://nexus.example.com/repository/pypi-internal/ --cython --cibuildwheel
 
 # Dry run to check the cibuildwheel configuration
 pkg-deploy --repository-name pypi --cython --cibuildwheel --dry-run
