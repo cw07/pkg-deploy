@@ -28,7 +28,6 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "toml",
     "tomlkit",
     "build",
     "twine",

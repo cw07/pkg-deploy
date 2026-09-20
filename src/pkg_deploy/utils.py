@@ -75,7 +75,8 @@ def get_credentials(username: Optional[str] = None,
 
 def parse_prerelease(version: str):
     # Match the pattern: numbers.numbers.numbers + optional prerelease type + optional version
-    pattern = r'^(\d+)\.(\d+)\.(\d+)([abc]|rc)?(\d*)$'
+    # Only a / b / rc, matching validate_version_arg().
+    pattern = r'^(\d+)\.(\d+)\.(\d+)(a|b|rc)?(\d*)$'
     match = re.match(pattern, version)
 
     if match:
@@ -103,48 +104,35 @@ def parse_prerelease(version: str):
         raise ValueError(f"Invalid version format: {version}")
 
 
-def get_pypirc_info():
+def get_pypirc_info() -> dict:
     """
     Read and parse .pypirc file from user's home directory.
-    Returns a dictionary with repository configurations.
+    Returns a dictionary with repository configurations; raises on any problem.
     """
-    # Get the path to .pypirc file
-    home_dir = Path.home()
-    pypirc_path = home_dir / '.pypirc'
-
+    pypirc_path = Path.home() / '.pypirc'
     if not pypirc_path.exists():
         raise FileNotFoundError(f"No .pypirc file found at {pypirc_path}")
 
-    # Parse the configuration file
     config = configparser.ConfigParser()
-
     try:
         config.read(pypirc_path)
+    except configparser.Error as e:
+        raise ValueError(f"Malformed .pypirc at {pypirc_path}: {e}") from e
 
-        # Extract information
-        pypirc_info = {}
+    pypirc_info = {}
+    if config.has_section('distutils') and config.has_option('distutils', 'index-servers'):
+        pypirc_info['index_servers'] = config.get('distutils', 'index-servers').split()
 
-        # Get index servers if available
-        if config.has_section('distutils') and config.has_option('distutils', 'index-servers'):
-            index_servers = config.get('distutils', 'index-servers').split()
-            pypirc_info['index_servers'] = index_servers
+    repositories = {
+        section: {option: config.get(section, option) for option in config.options(section)}
+        for section in config.sections()
+        if section != 'distutils'
+    }
+    if not repositories:
+        raise ValueError(f"No repositories configuration found in {pypirc_path}")
 
-        # Get repository configurations
-        repositories = {}
-        for section_name in config.sections():
-            if section_name != 'distutils':
-                repo_config = {}
-                for option in config.options(section_name):
-                    repo_config[option] = config.get(section_name, option)
-                repositories[section_name] = repo_config
-        if not repositories:
-            raise ValueError(f"No repositories configuration found in {pypirc_path}")
-
-        pypirc_info['repositories'] = repositories
-        return pypirc_info
-    except Exception as e:
-        logger.error(f"Error reading .pypirc file: {e}")
-        return None
+    pypirc_info['repositories'] = repositories
+    return pypirc_info
 
 def ensure_uv_installed():
     """Check if 'uv' is available, and install it if not."""
@@ -174,7 +162,7 @@ def ensure_uv_installed():
         )
         logger.info("uv installed successfully.")
     except subprocess.CalledProcessError as e:
-        logger.error("Failed to install uv:", e.stderr)
+        logger.error(f"Failed to install uv: {e.stderr}")
         raise RuntimeError(
             "Failed to install uv automatically. Please install it manually:\n"
             "  pip install uv\n"

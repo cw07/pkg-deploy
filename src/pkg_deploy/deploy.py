@@ -25,18 +25,21 @@ def parse_args(args):
         description="Modern Python Package Deployment Tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-        Examples:
-          # Deploy to PyPI, patch version
-          python deploy.py --package-name my-package --version-type patch
+        Examples (run from the project directory, the one holding pyproject.toml):
+          # Patch bump, upload to the [pypi] section of ~/.pypirc
+          pkg-deploy --repository-name pypi
 
-          # Deploy to private Nexus, using cython
-          python deploy.py --package-name my-package --version-type minor
-              --repository-url https://nexus.example.com/repository/pypi-internal/
-              --username admin
-              --password secret
+          # Minor bump, Cython-compiled and minified, to a private index
+          pkg-deploy --repository-name my-nexus --version-type minor --cython --minify
 
-          # Dry run
-          python deploy.py --package-name my-package --version-type patch --dry-run
+          # Same, but with an explicit URL and credentials prompted interactively
+          pkg-deploy --repository-url https://nexus.example.com/repository/pypi-internal/ --cython
+
+          # Start a pre-release cycle: 1.2.4 -> 1.2.5a1, then a2, b1, rc1, and finally 1.2.5
+          pkg-deploy --repository-name pypi --version-type alpha
+
+          # Build and inspect without publishing, bumping or touching git
+          pkg-deploy --repository-name pypi --dry-run --verbose
           """)
 
     parser.add_argument(
@@ -50,20 +53,25 @@ def parse_args(args):
         "--package-dir",
         type=Path,
         default=None,
-        help="Package directory (default: current directory)"
+        help="Directory that holds the package sources, e.g. src. Default: resolved from "
+             "tool.setuptools.packages.find.where / tool.setuptools.package-dir in "
+             "pyproject.toml, falling back to <project-dir>/<package-name>"
     )
 
     parser.add_argument(
         "--version-type", "-vt",
         default="patch",
-        help="Version bump type (default: patch)",
+        help="Version bump type (default: patch). From a final release, alpha/beta/rc start a "
+             "cycle on the next patch version (1.2.4 -> 1.2.5a1); from a pre-release, patch "
+             "finalises it (1.2.5rc1 -> 1.2.5) and stages only move forward",
         choices=["major", "minor", "patch", "alpha", "beta", "rc"]
     )
 
     parser.add_argument(
         "--new-version", "-v",
         type=validate_version_arg,
-        help="New version number, if not specified, a new version will be resolved by version-type"
+        help="Exact version to publish, overriding --version-type. Format: MAJOR.MINOR.PATCH with "
+             "an optional aN / bN / rcN suffix"
     )
 
     parser.add_argument(
@@ -75,7 +83,8 @@ def parse_args(args):
     parser.add_argument(
         "--cibuildwheel",
         action="store_true",
-        help="Use cibuildwheel to build cython code"
+        help="Build with cibuildwheel: one wheel per configured Python version, for this platform "
+             "only (needs Docker on Linux)"
     )
 
     parser.add_argument(
@@ -93,17 +102,17 @@ def parse_args(args):
 
     parser.add_argument(
         "--repository-url", "-ru",
-        help="Repository URL"
+        help="Upload URL of the index; used when --repository-name is not in ~/.pypirc"
     )
 
     parser.add_argument(
         "--username", "-u",
-        help="Username for authentication"
+        help="Username; prompted for if omitted and not in ~/.pypirc"
     )
 
     parser.add_argument(
         "--password", "-p",
-        help="Password for authentication"
+        help="Password or API token; prompted for (hidden) if omitted and not in ~/.pypirc"
     )
 
     parser.add_argument(
@@ -124,21 +133,20 @@ def parse_args(args):
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Perform a dry run without actual deployment"
+        help="Build the wheel and log what would be uploaded, but do not publish, bump the "
+             "version, or touch git. dist/ and build/ are still created and cleaned up"
     )
 
     parser.add_argument(
         "--verbose", "-V",
         action="store_true",
-        help="Enable verbose logging"
+        help="Debug logging, including the full output of the build tool"
     )
 
     args = parser.parse_args(args)
     if not args.repository_url and not args.repository_name:
         parser.error("Either --repository-url or --repository-name must be provided.")
-    # Silently ignoring --minify would be dangerous: it exists to protect the sources, but a
-    # non-Cython build ships them verbatim, so the user would publish readable code believing
-    # otherwise.
+    # --minify lives inside the generated Cython setup.py; the standard build has no hook for it.
     if args.minify and not args.cython:
         parser.error("--minify/-m only applies to Cython builds. Add --cython/-c, or drop --minify.")
     return args
@@ -302,7 +310,7 @@ class PackageDeploy:
             password = repository_info.get("password")
             if not url:
                 raise ValueError(
-                    f"Repository '{self.args.repository_name}' must have a 'repository' url section in .pypirc"
+                    f"Repository '{self.args.repository_name}' must have a 'repository' url in .pypirc. "
                     f"Only 'pypi' can omit the repository URL.")
             if not username or not password:
                 username, password = get_credentials(
@@ -324,7 +332,7 @@ class PackageDeploy:
 
     @staticmethod
     def check_require_package(cython: bool):
-        required_packages = ["build", "twine", "toml", "tomlkit"]
+        required_packages = ["build", "twine", "tomlkit"]
         if cython:
             required_packages.append("Cython")
 

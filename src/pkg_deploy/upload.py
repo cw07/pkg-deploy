@@ -1,3 +1,4 @@
+import os
 import sys
 import logging
 import subprocess
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class Upload(ABC):
-    """Deploy Base class"""
+    """Upload strategy: hand the built wheels to an index."""
 
     @abstractmethod
     def upload(self, config: DeployConfig, dist_dir: Path) -> bool:
@@ -19,7 +20,8 @@ class Upload(ABC):
 
 
 class NexusUpload(Upload):
-    """Nexus Deploy"""
+    """Upload with twine. Despite the name this serves any index - PyPI or a private
+    one such as Nexus - since twine speaks the same protocol to all of them."""
 
     @staticmethod
     def get_wheel_files(config: DeployConfig):
@@ -54,24 +56,20 @@ class NexusUpload(Upload):
             if config.repository_name != "pypi":
                 cmd.extend(["--repository-url", config.repository_url])
 
-            cmd.extend(["--username", config.username])
-            cmd.extend(["--password", config.password])
+            # Credentials go through TWINE_USERNAME / TWINE_PASSWORD, never argv.
+            env = os.environ.copy()
+            if config.username:
+                env["TWINE_USERNAME"] = config.username
+            if config.password:
+                env["TWINE_PASSWORD"] = config.password
 
-            # Create masked command for logging
-            masked_cmd = []
-            for i, arg in enumerate(cmd):
-                if i > 0 and cmd[i - 1] == "--password":
-                    masked_cmd.append("******")
-                else:
-                    masked_cmd.append(arg)
-
-            logger.info(f"Running: {' '.join(masked_cmd)}")
+            logger.info(f"Running: {' '.join(cmd)}")
 
             if config.dry_run:
                 logger.info(f"DRY RUN: wheel files from dist directory: {wheel_files}")
                 logger.info(f"DRY RUN: cmd: {cmd}")
             else:
-                result = subprocess.run(cmd, capture_output=True, text=True)
+                result = subprocess.run(cmd, capture_output=True, text=True, env=env)
                 if result.returncode != 0:
                     raise ValueError(f"Upload failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
                 logger.info(f"Package uploaded to {config.repository_url} successfully")

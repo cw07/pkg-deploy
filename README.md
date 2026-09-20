@@ -95,7 +95,7 @@ zip-safe = false
 [tool.setuptools.packages.find]
 where = ["src"]
 
-# Optional: Version bump configuration, other wise will only bump version in pyproject.toml
+# Optional: extra files to bump alongside pyproject.toml (otherwise only pyproject.toml changes)
 [[tool.bumpversion.file]]
 filename = "src/your_package/__init__.py"
 search = '__version__ = "{current_version}"'
@@ -126,6 +126,11 @@ where = ["src"]
 [tool.setuptools]
 package-dir = {"my_package" = "custom/path"}
 ```
+
+> **Note**: only the last path component is used to locate sources during a Cython build
+> (`custom/path` → `path`), so nested package directories work for standard builds but not
+> with `--cython`. Keep the sources one level below the project root (the `src` layout) when
+> compiling.
 
 > **⚠️ Important**: When package directory is configured in multiple places within `pyproject.toml` (such as both `tool.setuptools.packages.find.where` and `tool.setuptools.package-dir`), all configurations must point to the same directory. If they differ, `pkg-deploy` will raise a `ValueError` with the message "Package directory from toml are not the same".
 
@@ -169,11 +174,25 @@ pkg-deploy --repository-name pypi --version-type major
 # Use specific version
 pkg-deploy --repository-name pypi --new-version 2.1.0
 
-# Pre-release versions
-pkg-deploy --repository-name pypi --version-type alpha  # 1.0.0a1
-pkg-deploy --repository-name pypi --version-type beta   # 1.0.0b1
-pkg-deploy --repository-name pypi --version-type rc     # 1.0.0rc1
+# Pre-release cycle. From a final release, alpha/beta/rc start a cycle on the
+# NEXT patch version, because PEP 440 sorts 1.2.4a1 before 1.2.4 and a pre-release
+# published after its final would be invisible to pip.
+pkg-deploy --repository-name pypi --version-type alpha  # 1.2.4    -> 1.2.5a1
+pkg-deploy --repository-name pypi --version-type alpha  # 1.2.5a1  -> 1.2.5a2
+pkg-deploy --repository-name pypi --version-type beta   # 1.2.5a2  -> 1.2.5b1
+pkg-deploy --repository-name pypi --version-type rc     # 1.2.5b1  -> 1.2.5rc1
+pkg-deploy --repository-name pypi                       # 1.2.5rc1 -> 1.2.5  (patch finalises)
 ```
+
+Rules for pre-releases:
+
+- Stages only move forward (`alpha` → `beta` → `rc`); any can be skipped, none can be revisited.
+  `1.2.5rc1 --version-type alpha` is refused — use `--new-version` to force a value.
+- `patch` (the default) on a pre-release drops the suffix: `1.2.5a1`, `1.2.5b1` and `1.2.5rc1`
+  all finalise to `1.2.5`.
+- `minor` / `major` on a pre-release abandon the cycle: `1.2.5rc1` → `1.3.0` / `2.0.0`.
+- A pre-release of the next *minor* (`1.3.0a1`) is not inferred — pass it explicitly with
+  `--new-version 1.3.0a1`.
 
 ### Cython Builds
 
@@ -209,20 +228,23 @@ The Cython version actually used comes from your `[build-system].requires`. If y
 specific one, pin it there — the `setup_requires` line in the generated `setup.py` is a legacy
 field and does not control it.
 
-### Cross-Platform Multiple Version Builds with cibuildwheel
+### Multiple Python Version Builds with cibuildwheel
 
-`pkg-deploy` supports `cibuildwheel` for building wheels across multiple Python versions and platforms as specified in your `pyproject.toml` configuration.
+`pkg-deploy` can hand the build to `cibuildwheel`, which produces one wheel per Python version
+listed in your `[tool.cibuildwheel]` configuration in a single run.
+
+cibuildwheel builds for the operating system it is running on: on Linux it produces manylinux
+wheels (inside Docker), on macOS macOS wheels, on Windows Windows wheels. To cover several
+platforms, run `pkg-deploy --cibuildwheel` once on each — it does not cross-compile.
 
 #### Benefits
-- **Cython Integration**: Build wheels for all specified versions in one run
-- **Multi-Platform Support**: Automatically builds wheels for Linux, macOS, and Windows
-- **Multiple Python Versions**: Builds for all Python versions specified in configuration
-- **Binary Compatibility**: Creates optimized binary wheels with proper platform tags
+- **Multiple Python Versions**: One run yields a wheel for every version in `build = "cp38-* cp39-* ..."`
+- **Proper Platform Tags**: Wheels are tagged and (on Linux) audited for manylinux compatibility
 
 #### Requirements
-- **Docker (Linux only)**: Docker must be installed and running when building on Linux systems
-- **cibuildwheel**: Automatically installed as a build dependency
-- **Sufficient disk space**: Cross-platform builds require more storage
+- **Docker (Linux only)**: Docker must be installed and running when building on Linux
+- **cibuildwheel**: Installed together with `pkg-deploy`
+- **Sufficient disk space**: One build environment per Python version
 
 #### Configuration
 
@@ -250,22 +272,21 @@ before-build = "pip install Cython"
 #### Usage Examples
 
 ```bash
-# Cross-platform Cython build with cibuildwheel
+# Cython build for every configured Python version
 pkg-deploy --repository-name pypi --version-type patch --cython --cibuildwheel
 
-# Deploy to private repository with cross-platform builds
+# Same, to a private repository
 pkg-deploy --repository-url https://nexus.example.com/repository/pypi-internal/ \
            --username admin --password secret --cython --cibuildwheel
 
-# Dry run to test cross-platform build configuration
+# Dry run to check the cibuildwheel configuration
 pkg-deploy --repository-name pypi --cython --cibuildwheel --dry-run
 ```
 
 #### Limitations
-- **Build Time**: Cross-platform builds take significantly longer than single-platform builds
+- **Build Time**: Each Python version is compiled separately, so runs take proportionally longer
 - **Docker Dependency**: Linux builds require Docker to be installed and running
-- **Resource Usage**: Requires more CPU, memory, and disk space during build process
-- **Platform Restrictions**: Some platform-specific dependencies may not be available across all targets
+- **One platform per run**: Wheels for other operating systems need a run on that system
 
 ### Advanced Options
 
@@ -296,7 +317,7 @@ pkg-deploy --repository-name pypi --dry-run --verbose
 - `--new-version, -v`: Specify exact version number (overrides version-type). Must match `MAJOR.MINOR.PATCH` with an optional `aN` / `bN` / `rcN` suffix — `1.2`, `1.2.3.post1` and `1.2.3dev1` are rejected
 - `--cython, -c`: Enable Cython compilation for performance
 - `--minify, -m`: Minify the code before compilation to reduce its size. Must be used together with `--cython`
-- `--cibuildwheel`: Use cibuildwheel for cross-platform wheel building (requires Docker on Linux)
+- `--cibuildwheel`: Build with cibuildwheel — one wheel per configured Python version, for the platform you run it on (requires Docker on Linux)
 - `--repository-name, -rn`: Repository name from .pypirc configuration (e.g., 'pypi', 'testpypi')
 - `--repository-url, -ru`: Repository upload URL (prompts for username/password if not in .pypirc)
 - `--username, -u`: Authentication username (optional if configured in .pypirc)
@@ -304,7 +325,7 @@ pkg-deploy --repository-name pypi --dry-run --verbose
 - `--discard-version-bump`: Leave the repository untouched — no bump commit, no tag, no push, and the version bump written to `pyproject.toml` is reverted after a successful upload. The published version is then recorded nowhere in the repo, so the next deploy resolves to that same version again and the upload clashes; pair it with `--new-version`
 - `--skip-git-status-check`: Skip Git status validation before deployment
 - `--dry-run`: Build the wheel and log what would be uploaded, without publishing it, bumping the version, or touching Git. The build itself really runs, so `dist/` and `build/` are created and then cleaned up
-- `--verbose, -V`: Enable detailed logging output
+- `--verbose, -V`: Debug logging, including the full output of the build tool (which packages the isolated build environment installed, which modules were cythonized, compiler warnings)
 
 ## Environment Support
 
@@ -333,6 +354,9 @@ For PyPI, use API tokens instead of passwords:
 ### Credential Storage
 
 - Store credentials in `.pypirc` for reusability
+- Credentials are handed to twine through the `TWINE_USERNAME` / `TWINE_PASSWORD` environment
+  variables of the child process, never on its command line, so they do not show up in `ps` or
+  in any logged command
 - Leave `--username` / `--password` off the command line and let `pkg-deploy` prompt for them
   instead — the prompt uses `getpass`, so nothing is echoed or kept in your shell history
 
@@ -350,7 +374,7 @@ Solution: Commit or stash your changes before deployment, or use `--skip-git-sta
 ```
 Error: Missing required packages: build, twine
 ```
-Solution: Install the missing packages. `build`, `twine`, `toml` and `tomlkit` are always
+Solution: Install the missing packages. `build`, `twine` and `tomlkit` are always
 required; `--cython` additionally requires `Cython`.
 
 **Cython Build Conflicts**

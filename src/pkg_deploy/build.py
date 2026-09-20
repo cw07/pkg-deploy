@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from tomlkit.toml_document import TOMLDocument
 
-from .utils import save_config, is_uv_venv, ensure_uv_installed
+from .utils import save_config, ensure_uv_installed
 
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ class BuildStrategy(ABC):
     def build_cmd(config: DeployConfig):
         if config.use_cibuildwheel:
             cmd = ['cibuildwheel', '--output-dir', 'dist']
-        elif is_uv_venv():
+        elif config.is_uv_venv:
             ensure_uv_installed()
             cmd = ["uv", "build", "--wheel"]
         else:
@@ -69,6 +69,7 @@ class StandardBuildStrategy(BuildStrategy):
         if result.returncode != 0:
            raise ValueError(f"Build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
         logger.info("Standard build completed successfully")
+        logger.debug(f"Build output:\n{result.stdout}\n{result.stderr}")
         return True
 
 class CythonBuildStrategy(BuildStrategy):
@@ -97,6 +98,7 @@ class CythonBuildStrategy(BuildStrategy):
             if result.returncode != 0:
                 raise ValueError(f"Cython build failed, \nstdout: {result.stdout}\nstderr: {result.stderr}")
             logger.info("Cython build completed successfully")
+            logger.debug(f"Build output:\n{result.stdout}\n{result.stderr}")
             return True
         except Exception as e:
             logger.error(f"Cython build error: {e}")
@@ -213,24 +215,32 @@ class CythonBuildStrategy(BuildStrategy):
                 f"tooling integration and is the recommended standard."
             )
 
-        if "authors" in toml_config["project"]:
-            author_names = ", ".join(p["name"] for p in toml_config["project"]["authors"] if "name" in p)
-            author_emails = ", ".join(p["email"] for p in toml_config["project"]["authors"] if "email" in p)
+        # Every metadata value is pulled out as a PLAIN str and rendered with !r below.
+        # Interpolating them raw inside quotes breaks the generated file as soon as a
+        # description or author name contains a quote (e.g. "O'Brien"); repr() always
+        # yields a valid Python literal.
+        project = toml_config["project"]
+        name = str(project["name"])
+        version = str(project["version"])
+        description = str(project.get("description", ""))
+        requires_python = str(project.get("requires-python", ""))
+        if "authors" in project:
+            author_names = ", ".join(str(p["name"]) for p in project["authors"] if "name" in p)
+            author_emails = ", ".join(str(p["email"]) for p in project["authors"] if "email" in p)
         else:
             author_names = ""
             author_emails = ""
-        if "scripts" in toml_config["project"]:
-            entry_points = [f"{k}={v}" for k, v in toml_config["project"]["scripts"].items()]
+        if "scripts" in project:
+            entry_points = [f"{k}={v}" for k, v in project["scripts"].items()]
         else:
             entry_points = []
 
-        # Both dependency tables are rendered through repr() of PLAIN Python
-        # objects (tomlkit's .unwrap()), not str() of tomlkit's Array/Table.
-        # The two happen to print alike today, but only repr() of a list/dict
-        # is guaranteed to be a Python literal that setup.py can execute.
-        dependencies = toml_config["project"].get("dependencies")
+        # Same rule for the two dependency tables: .unwrap() to plain list/dict, then
+        # repr() below. str() of tomlkit's Array/Table happens to print alike today,
+        # but only repr() of a plain object is guaranteed to be a valid Python literal.
+        dependencies = project.get("dependencies")
         install_requires = dependencies.unwrap() if dependencies else []
-        optional = toml_config["project"].get("optional-dependencies")
+        optional = project.get("optional-dependencies")
         extras_require = optional.unwrap() if optional else {}
 
         # Build the ext_modules construction. Generated C sources go under build/cython
@@ -320,12 +330,12 @@ class CythonBuildStrategy(BuildStrategy):
                 return True
     
         setup(
-            name="{toml_config["project"]["name"]}",
-            version="{toml_config["project"]["version"]}",
-            {f"author='{author_names}'," if author_names else ""}
-            {f"author_email='{author_emails}'," if author_emails else ""}
-            {f"description='{toml_config['project']['description']}'," if toml_config["project"].get("description", "") else ""}
-            {f"python_requires='{toml_config['project']['requires-python']}'," if toml_config["project"].get("requires-python") else ""}
+            name={name!r},
+            version={version!r},
+            {f"author={author_names!r}," if author_names else ""}
+            {f"author_email={author_emails!r}," if author_emails else ""}
+            {f"description={description!r}," if description else ""}
+            {f"python_requires={requires_python!r}," if requires_python else ""}
             {f"install_requires={install_requires!r}," if install_requires else ""}
             {f"extras_require={extras_require!r}," if extras_require else ""}
             entry_points={{

@@ -20,70 +20,56 @@ class VersionManager:
     def get_current_version(self) -> str:
         return str(self.toml_config['project']['version'])
 
+    # Pre-release stages in ascending order. A bump may only move forward through them.
+    _PRERELEASE_STAGES = {'alpha': 'a', 'beta': 'b', 'rc': 'rc'}
+    _STAGE_ORDER = ['a', 'b', 'rc']
+
     @staticmethod
     def resolve_new_version(current_version: str, version_type: str) -> str:
-        version_info = parse_prerelease(current_version)
-        major = version_info['major']
-        minor = version_info['minor']
-        patch = version_info['patch']
-        prerelease_type = version_info['prerelease_type']
-        prerelease_version = version_info['prerelease_version']
-        has_prerelease = version_info['has_prerelease']
+        """Compute the next version.
 
-        # Handle version bumping
+        Rules:
+          final   + patch/minor/major -> ordinary bump            1.2.4    -> 1.2.5
+          final   + alpha/beta/rc     -> next patch, new cycle    1.2.4    -> 1.2.5a1
+          pre     + same stage        -> increment                1.2.5a1  -> 1.2.5a2
+          pre     + later stage       -> switch, reset to 1       1.2.5a2  -> 1.2.5b1
+          pre     + earlier stage     -> error                    1.2.5rc1 -> alpha: refused
+          pre     + patch             -> finalise (drop suffix)   1.2.5rc1 -> 1.2.5
+          pre     + minor/major       -> abandon cycle, bump      1.2.5rc1 -> 1.3.0
+        A pre-release must sit on a version that has not shipped yet, because PEP 440
+        sorts 1.2.4a1 BEFORE 1.2.4 - publishing it after 1.2.4 would be invisible to pip.
+        """
+        info = parse_prerelease(current_version)
+        major, minor, patch = info['major'], info['minor'], info['patch']
+        stage, number = info['prerelease_type'], info['prerelease_version']
+
         if version_type == 'patch':
-            prerelease_type = None
-            patch += 1
+            if stage is None:
+                patch += 1
+            stage = None
         elif version_type == 'minor':
-            minor += 1
-            patch = 0
-            prerelease_type = None
+            minor, patch, stage = minor + 1, 0, None
         elif version_type == 'major':
-            major += 1
-            minor = 0
-            patch = 0
-            prerelease_type = None
-        elif version_type == 'alpha':
-            if has_prerelease:
-                if prerelease_type == 'a':
-                    prerelease_version += 1
-                else:
-                    prerelease_type = 'a'
-                    prerelease_version = 1
+            major, minor, patch, stage = major + 1, 0, 0, None
+        elif version_type in VersionManager._PRERELEASE_STAGES:
+            wanted = VersionManager._PRERELEASE_STAGES[version_type]
+            order = VersionManager._STAGE_ORDER
+            if stage is None:
+                patch += 1
+                stage, number = wanted, 1
+            elif stage == wanted:
+                number += 1
+            elif order.index(wanted) > order.index(stage):
+                stage, number = wanted, 1
             else:
-                prerelease_type = 'a'
-                prerelease_version = 1
-        elif version_type == 'beta':
-            if has_prerelease:
-                if prerelease_type == 'a':
-                    prerelease_type = 'b'
-                    prerelease_version = 1
-                elif prerelease_type == 'b':
-                    prerelease_version += 1
-                else:
-                    prerelease_type = 'b'
-                    prerelease_version = 1
-            else:
-                prerelease_type = 'b'
-                prerelease_version = 1
-        elif version_type == 'rc':
-            if has_prerelease:
-                if prerelease_type in ['a', 'b']:
-                    prerelease_type = 'rc'
-                    prerelease_version = 1
-                elif prerelease_type == 'rc':
-                    prerelease_version += 1
-            else:
-                prerelease_type = 'rc'
-                prerelease_version = 1
+                raise ValueError(
+                    f"Cannot go from {current_version} to {version_type}: pre-release stages "
+                    f"only move forward (alpha -> beta -> rc). Use --new-version to force a value."
+                )
         else:
             raise ValueError(f"Invalid version type: {version_type}")
 
-        if prerelease_type:
-            new_version = f"{major}.{minor}.{patch}{prerelease_type}{prerelease_version}"
-        else:
-            new_version = f"{major}.{minor}.{patch}"
-        return new_version
+        return f"{major}.{minor}.{patch}" + (f"{stage}{number}" if stage else "")
 
     def bump_version(self, version_type: str, new_version: Optional[str]=None, dry_run: bool = False) -> str:
         current_version = self.get_current_version()
