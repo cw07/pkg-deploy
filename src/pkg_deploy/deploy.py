@@ -293,8 +293,23 @@ class PackageDeploy:
             return False
 
     def get_twine_upload_info(self):
-        pypirc_info = get_pypirc_info()
-        repos = pypirc_info["repositories"]
+        if not self.args.repository_name:
+            # Explicit --repository-url: .pypirc is not consulted at all.
+            url = self.args.repository_url
+            username, password = get_credentials(username=self.args.username,
+                                                 password=self.args.password,
+                                                 url=url)
+            return url, username, password
+
+        try:
+            repos = get_pypirc_info()["repositories"]
+        except FileNotFoundError:
+            # 'pypi' needs nothing from the file (token is prompted for); any other
+            # name is a lookup into it, so the file must exist.
+            if self.args.repository_name != "pypi":
+                raise
+            repos = {}
+
         if self.args.repository_name == "pypi":
             url = None
             username = "__token__"
@@ -303,7 +318,7 @@ class PackageDeploy:
                 password = repos["pypi"].get("password")
             if not password:
                 _, password = get_credentials(username=username, is_pypi=True)
-        elif self.args.repository_name and self.args.repository_name in repos:
+        elif self.args.repository_name in repos:
             repository_info = repos[self.args.repository_name]
             url = repository_info.get("repository")
             username = repository_info.get("username")
@@ -318,7 +333,7 @@ class PackageDeploy:
                     password=password,
                     url=url
                 )
-        elif self.args.repository_name and not self.args.repository_url:
+        elif not self.args.repository_url:
             raise ValueError(
                 f"Repository '{self.args.repository_name}' not found in .pypirc. "
                 f"Please provide --repository-url or add required info in .pypirc"
