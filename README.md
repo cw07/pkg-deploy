@@ -154,7 +154,10 @@ must be inside the project directory.
 
 ### .pypirc Configuration
 
-For repository authentication, create a `.pypirc` file in your user home directory:
+`--repository-name` looks the index up in a `.pypirc` file in your home directory. It is only
+needed for that: `--repository-url` never reads it (credentials are taken from `--username` /
+`--password` or prompted for), and `--repository-name pypi` works without it too, prompting for
+the API token. Location:
 - Unix/macOS: `~/.pypirc`
 - Windows: `C:\Users\username\.pypirc`
 
@@ -337,7 +340,7 @@ pkg-deploy --repository-name pypi --dry-run --keep-dist
 - `--cython, -c`: Enable Cython compilation for performance
 - `--minify, -m`: Minify the code before compilation to reduce its size. Must be used together with `--cython`
 - `--cibuildwheel`: Build with cibuildwheel — one wheel per configured Python version, for the platform you run it on (requires Docker on Linux)
-- `--repository-name, -rn`: Repository name from .pypirc configuration (e.g., 'pypi', 'testpypi')
+- `--repository-name, -rn`: Section name in `~/.pypirc` to take the URL and credentials from. `pypi` is special: it needs no section (URL is implied, token is prompted for if not stored)
 - `--repository-url, -ru`: Repository upload URL (prompts for username/password if not in .pypirc)
 - `--username, -u`: Authentication username (optional if configured in .pypirc)
 - `--password, -p`: Authentication password/token (optional if configured in .pypirc)
