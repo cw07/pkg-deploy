@@ -227,6 +227,9 @@ class PackageDeploy:
             else:
                 build_strategy = StandardBuildStrategy()
 
+            # get_wheel_files() uploads every wheel in dist/, so a leftover from an earlier
+            # run must not be there when the new one lands.
+            shutil.rmtree(self.config.project_dir / 'dist', ignore_errors=True)
             try:
                 built = build_strategy.build(self.config, self.version_manager.toml_config)
                 if built:
