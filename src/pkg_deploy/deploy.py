@@ -9,7 +9,7 @@ from tomlkit import TOMLDocument
 
 from .upload import Upload, NexusUpload
 from .version_managment import VersionManager
-from .build import DeployConfig, CythonBuildStrategy, StandardBuildStrategy
+from .build import DeployConfig, CythonBuildStrategy, StandardBuildStrategy, resolve_source_layout
 from .utils import get_pypirc_info, get_credentials, is_uv_venv, validate_version_arg, load_config
 
 
@@ -168,6 +168,7 @@ class PackageDeploy:
 
         toml_config = load_config(pyproject_path)
         package_dir = self.resolve_package_dir(toml_config)
+        package_entry, source_root = resolve_source_layout(self.args.project_dir, package_dir)
 
         url, username, password = self.get_twine_upload_info()
 
@@ -176,7 +177,8 @@ class PackageDeploy:
             package_name=toml_config["project"]["name"],
             project_dir=self.args.project_dir,
             package_dir=package_dir,
-            package_entry=package_dir.name,
+            package_entry=package_entry,
+            source_root=source_root,
             pyproject_path=pyproject_path,
             version_type=self.args.version_type,
             new_version=self.args.new_version,
@@ -448,14 +450,15 @@ class PackageDeploy:
     def cleanup_build_files(self):
         logger.info('Deleting build, dist and egg-info files after deployment')
         project_dir = Path(self.config.project_dir)
-        package_dir = Path(self.config.package_dir)
+        # setuptools writes *.egg-info next to the top-level packages, i.e. under source_root.
+        egg_root = project_dir / self.config.source_root
         # Cython intermediates are generated under build/cython. Never recursively
         # remove *.c from the package tree because projects may own those sources.
         shutil.rmtree(project_dir / 'dist', ignore_errors=True)
         shutil.rmtree(project_dir / 'build', ignore_errors=True)
-        shutil.rmtree(package_dir / f'{self.config.package_name}.egg-info', ignore_errors=True)
+        shutil.rmtree(egg_root / f'{self.config.package_name}.egg-info', ignore_errors=True)
         egg_info_name = self.config.package_name.replace("-", "_")
-        shutil.rmtree(package_dir / f'{egg_info_name}.egg-info', ignore_errors=True)
+        shutil.rmtree(egg_root / f'{egg_info_name}.egg-info', ignore_errors=True)
         if not self.setup_file_exist:
             (project_dir / "setup.py").unlink(missing_ok=True)
 

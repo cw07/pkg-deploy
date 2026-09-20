@@ -127,10 +127,11 @@ where = ["src"]
 package-dir = {"my_package" = "custom/path"}
 ```
 
-> **Note**: only the last path component is used to locate sources during a Cython build
-> (`custom/path` → `path`), so nested package directories work for standard builds but not
-> with `--cython`. Keep the sources one level below the project root (the `src` layout) when
-> compiling.
+Both the `src` layout and the flat layout (package directly under the project root, no
+`src/`) are supported, including for Cython builds. `pkg-deploy` tells them apart by whether the
+resolved directory contains an `__init__.py`: if it does, it is the package itself and its parent
+is treated as the source root; otherwise it is a container such as `src/`. The resolved directory
+must be inside the project directory.
 
 > **⚠️ Important**: When package directory is configured in multiple places within `pyproject.toml` (such as both `tool.setuptools.packages.find.where` and `tool.setuptools.package-dir`), all configurations must point to the same directory. If they differ, `pkg-deploy` will raise a `ValueError` with the message "Package directory from toml are not the same".
 
